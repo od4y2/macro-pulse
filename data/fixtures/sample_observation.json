@@ -1,0 +1,8 @@
+{
+  "data_mode": "synthetic_fixture",
+  "country_code": "USA",
+  "indicator_id": "DEMO_CPI",
+  "period": "2025-01",
+  "value": 100.0,
+  "unit": "index"
+}

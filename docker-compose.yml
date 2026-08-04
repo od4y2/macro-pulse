@@ -1,0 +1,18 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: macropulse
+      POSTGRES_USER: macropulse
+      POSTGRES_PASSWORD: macropulse
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U macropulse"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - macropulse_pgdata:/var/lib/postgresql/data
+volumes:
+  macropulse_pgdata:
