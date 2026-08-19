@@ -1,4 +1,6 @@
 .env
+.env.local
+.env.*.local
 .venv/
 __pycache__/
 .pytest_cache/
@@ -6,3 +8,6 @@ __pycache__/
 *.pyc
 *.egg-info/
 .DS_Store
+Configure-OpenCode-VolcengineArk-macOS.zsh
+setup_claude_glm52_mac_ark.zsh
+setup_opencode_glm52_ark_mac.zsh
