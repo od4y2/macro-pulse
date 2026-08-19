@@ -7,7 +7,7 @@
 ## Units
 - [ ] E01 - Local Toolchain and Repository Safety
 - [ ] E02 - Reproducible Dry Run and Recovery Practice
-- [ ] S01 - Research Scope and Claims Boundary
+- [x] S01 - Research Scope and Claims Boundary (2026-08-19): countries, RQ1-RQ4, non-claims, evidence vocabulary locked in `src/macropulse/scope.py` + `docs/ResearchScope.md`; 16 new tests. Evidence: `evidence/S01/scope-lock.md`. Env defect logged for E01: local process re-applies `chflags hidden` to `.venv`, breaking editable install; workaround `PYTHONPATH=src`.
 - [ ] S02 - Indicator Catalog and Source Audit
 - [ ] S03 - Architecture and Database Contract
 - [ ] S04 - FRED Connector Vertical Slice

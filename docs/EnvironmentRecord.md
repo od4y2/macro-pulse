@@ -29,3 +29,8 @@ Updated during WORKSPACE_AUDIT (2026-08-04); to be finalized in E01/E02.
 
 ## Editor / CLI
 - opencode CLI (coding assistant) on macOS zsh.
+
+## S01 update (2026-08-19)
+- Defect (open, for E01): `python -m macropulse.smoke` intermittently fails with ModuleNotFoundError. Root cause: `.venv/lib/python3.13/site-packages/*.pth` carries the macOS `hidden` BSD flag, which this Anaconda Python 3.13.14 build skips (hidden `.pth` treated as untrusted). An unidentified local process re-applies `chflags hidden` to `.venv` contents within seconds of removal; two unhide attempts were reverted. Workaround (deterministic): `PYTHONPATH=src python -m macropulse.smoke`. Pytest unaffected (`pythonpath=["src"]` ini). E01 must identify/stop the flagging process or move the venv outside the affected path.
+- `pip install -e '.[dev]'` rerun during S01 -> Success (repair attempt; flag issue persists).
+- Editor/CLI note: primary coding assistant is now Claude Code (handover from opencode on 2026-08-19).

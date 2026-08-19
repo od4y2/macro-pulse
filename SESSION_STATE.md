@@ -1,2 +1,2 @@
 # SESSION STATE
-WORKSPACE_AUDIT accepted (2026-08-04). Next action: execute `prompts/S01_Research_Scope_and_Claims_Boundary.md`. Do not rerun INIT and do not run any unit other than S01 until S01 is accepted. Reminder for E01: Docker is not installed locally and must be provisioned before any database-dependent work.
+S01 accepted (2026-08-19). Next action: execute `prompts/S02_Indicator_Catalog_and_Source_Audit.md`. Do not rerun INIT or any accepted unit; S02 is the only active unit until accepted. Environment reminders: Docker is not installed (must be provisioned before S03 database work); direct module commands need `PYTHONPATH=src` prefix (e.g. `PYTHONPATH=src python -m macropulse.smoke`) because of the open `.venv` hidden-flag defect logged for E01.
