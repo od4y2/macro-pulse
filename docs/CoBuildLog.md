@@ -13,3 +13,9 @@ Append student decisions, AI assistance, manual verification, and learning evide
 - AI assistance: drafted `src/macropulse/catalog.py` (12 indicators + validation), `src/macropulse/catalog_report.py`, `tests/test_catalog.py`, `docs/IndicatorCatalog.md`, evidence.
 - Manual verification: catalog report inspected for provenance, verification labels, and claims boundaries; 7 unverified codes surfaced explicitly rather than hidden.
 - Learning evidence: the no-whitespace source-code validation rule caught 2 annotated codes mid-unit, demonstrating tests-as-contract; TBD placeholders used instead of inventing uncertain API codes.
+
+## S03 (2026-08-19)
+- Student decisions: installed Docker manually (29.7.2); reaffirmed PostgreSQL-only (local Docker + cloud for Vercel target).
+- AI assistance: drafted `src/macropulse/db/` (engine/session + 11 ORM entities), Alembic scaffold + initial migration, `src/macropulse/api/schemas.py` contract, 18 tests, `docs/DatabaseContract.md`, evidence.
+- Manual verification: `\dt` output inspected (all 11 tables + alembic_version); migration applied and downgrade path documented.
+- Learning evidence: governance rules expressed as executable schema constraints (CHECK missing_reason, native enums, unique observation identity) and caught by live-DB integration tests rather than prose-only rules.

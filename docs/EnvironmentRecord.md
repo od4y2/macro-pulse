@@ -34,3 +34,9 @@ Updated during WORKSPACE_AUDIT (2026-08-04); to be finalized in E01/E02.
 - Defect (open, for E01): `python -m macropulse.smoke` intermittently fails with ModuleNotFoundError. Root cause: `.venv/lib/python3.13/site-packages/*.pth` carries the macOS `hidden` BSD flag, which this Anaconda Python 3.13.14 build skips (hidden `.pth` treated as untrusted). An unidentified local process re-applies `chflags hidden` to `.venv` contents within seconds of removal; two unhide attempts were reverted. Workaround (deterministic): `PYTHONPATH=src python -m macropulse.smoke`. Pytest unaffected (`pythonpath=["src"]` ini). E01 must identify/stop the flagging process or move the venv outside the affected path.
 - `pip install -e '.[dev]'` rerun during S01 -> Success (repair attempt; flag issue persists).
 - Editor/CLI note: primary coding assistant is now Claude Code (handover from opencode on 2026-08-19).
+
+## S03 update (2026-08-19)
+- Docker gap CLOSED: Docker 29.7.2 installed by student; `docker compose up -d db` pulls postgres:16-alpine, container healthy, `pg_isready` accepting connections.
+- Added to venv (and pyproject dependencies): sqlalchemy 2.0.52, alembic 1.19.1, psycopg[binary].
+- `PYTHONPATH=src alembic upgrade head` -> applied migration bcc78be651f0 to local dev DB.
+- `.venv` hidden-flag defect still open (E01); `PYTHONPATH=src` workaround unchanged.

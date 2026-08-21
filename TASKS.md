@@ -9,7 +9,7 @@
 - [ ] E02 - Reproducible Dry Run and Recovery Practice
 - [x] S01 - Research Scope and Claims Boundary (2026-08-19): countries, RQ1-RQ4, non-claims, evidence vocabulary locked in `src/macropulse/scope.py` + `docs/ResearchScope.md`; 16 new tests. Evidence: `evidence/S01/scope-lock.md`. Env defect logged for E01: local process re-applies `chflags hidden` to `.venv`, breaking editable install; workaround `PYTHONPATH=src`.
 - [x] S02 - Indicator Catalog and Source Audit (2026-08-19): 12-indicator catalog with units/frequency/sources/fallback status in `src/macropulse/catalog.py`; 14 new tests (34/34 total). 7 source codes marked unverified for S04/S05 live confirmation (2 explicit TBD-S05). Evidence: `evidence/S02/catalog-audit.md`.
-- [ ] S03 - Architecture and Database Contract
+- [x] S03 - Architecture and Database Contract (2026-08-19): 11-table PostgreSQL schema (ORM + Alembic migration `bcc78be651f0` applied to live docker-compose DB), API contract schemas, data flow/module boundaries in `docs/DatabaseContract.md`; 18 new tests (52/52 total, 6 live-DB). Docker gap closed (29.7.2). Evidence: `evidence/S03/db-contract.md`.
 - [ ] S04 - FRED Connector Vertical Slice
 - [ ] S05 - World Bank and ILOSTAT Connectors
 - [ ] S06 - Normalization Pipeline
