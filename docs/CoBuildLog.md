@@ -19,3 +19,9 @@ Append student decisions, AI assistance, manual verification, and learning evide
 - AI assistance: drafted `src/macropulse/db/` (engine/session + 11 ORM entities), Alembic scaffold + initial migration, `src/macropulse/api/schemas.py` contract, 18 tests, `docs/DatabaseContract.md`, evidence.
 - Manual verification: `\dt` output inspected (all 11 tables + alembic_version); migration applied and downgrade path documented.
 - Learning evidence: governance rules expressed as executable schema constraints (CHECK missing_reason, native enums, unique observation identity) and caught by live-DB integration tests rather than prose-only rules.
+
+## S04 (2026-08-19)
+- Student decisions: proceed with S04 in mocked/no-key mode (`.env.local` has placeholder FRED key only).
+- AI assistance: drafted `src/macropulse/connectors/{__init__,fred,persist}.py`, 18 tests, shared DB fixture in `tests/conftest.py`, evidence.
+- Manual verification: reviewed fixture values are obviously-round and labelled `mocked`; confirmed no test touches the network (MockTransport) and no live API call was claimed.
+- Learning evidence: httpx.MockTransport lets live-mode code paths be tested deterministically; "." missingness handling demonstrates "no hidden missingness" as code, not prose.

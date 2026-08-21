@@ -1,67 +1,22 @@
 """Integration tests against the live PostgreSQL instance (unit S03).
 
-These run only when the docker-compose database is reachable. They use a
-dedicated test database so the dev database is never mutated.
+Uses the shared `session` fixture (tests/conftest.py), which skips
+automatically when Postgres is unreachable.
 """
 
 from __future__ import annotations
 
 import datetime as dt
-import os
 
 import pytest
-from sqlalchemy import create_engine, text
-from sqlalchemy.exc import DataError, IntegrityError, SQLAlchemyError
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.exc import DataError, IntegrityError
 
-from macropulse.db.base import database_url
 from macropulse.db.models import (
-    Base,
     Country,
     Indicator,
     NormalizedObservation,
     SourceCatalogEntry,
 )
-
-TEST_DB_URL = os.environ.get(
-    "MACROPULSE_TEST_DB_URL",
-    database_url().rsplit("/", 1)[0] + "/macropulse_test",
-)
-
-
-def _db_available(url: str) -> bool:
-    try:
-        engine = create_engine(url.rsplit("/", 1)[0] + "/postgres", future=True)
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-        engine.dispose()
-        return True
-    except (OSError, SQLAlchemyError):
-        return False
-
-
-pytestmark = pytest.mark.skipif(
-    not _db_available(TEST_DB_URL), reason="PostgreSQL not reachable"
-)
-
-
-@pytest.fixture()
-def session():
-    admin = create_engine(TEST_DB_URL.rsplit("/", 1)[0] + "/postgres", future=True)
-    with admin.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
-        conn.execute(text("DROP DATABASE IF EXISTS macropulse_test"))
-        conn.execute(text("CREATE DATABASE macropulse_test"))
-    admin.dispose()
-
-    engine = create_engine(TEST_DB_URL, future=True)
-    Base.metadata.create_all(engine)
-    factory = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
-    s = factory()
-    try:
-        yield s
-    finally:
-        s.close()
-        engine.dispose()
 
 
 def _seed_reference_data(s):
