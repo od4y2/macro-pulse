@@ -25,3 +25,9 @@ Append student decisions, AI assistance, manual verification, and learning evide
 - AI assistance: drafted `src/macropulse/connectors/{__init__,fred,persist}.py`, 18 tests, shared DB fixture in `tests/conftest.py`, evidence.
 - Manual verification: reviewed fixture values are obviously-round and labelled `mocked`; confirmed no test touches the network (MockTransport) and no live API call was claimed.
 - Learning evidence: httpx.MockTransport lets live-mode code paths be tested deterministically; "." missingness handling demonstrates "no hidden missingness" as code, not prose.
+
+## S05 (2026-08-19)
+- Student decisions: none required this unit (no-key APIs); proceeded with live WB/ILOSTAT verification.
+- AI assistance: drafted worldbank.py + ilostat.py connectors, shared connector base, source-generic raw persistence, 24 tests, reproducible audit script; corrected the catalog with live-verified codes.
+- Manual verification: live audit output inspected line-by-line (14/14 OK); null-value patterns confirmed for Findex sparse series; dataflow registry consulted for correct ILOSTAT codes.
+- Learning evidence: the live audit caught three bugs mocked tests missed (WB date param, ILOSTAT timeout, lowercase ISO3 acceptance) - why live verification beats mocks alone; and the unverified-flag discipline caught a genuinely wrong ILOSTAT code from S02.

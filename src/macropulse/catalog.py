@@ -155,9 +155,9 @@ CATALOG: tuple[Indicator, ...] = (
         ),
         fallback_source=SourceRef(
             system="ilostat",
-            code="SDG_0811_SEX_AGE_RT",
-            verified="unverified",
-            coverage="ILOSTAT direct; confirm youth age filter and sex dimension in S05",
+            code="DF_SDG_0852_SEX_AGE_RT",
+            verified="confirmed",
+            coverage="ILOSTAT SDMX 8.5.2 unemployment rate by sex and age; filter SEX_T and the 15-24 age dimension",
         ),
         fallback_status="primary-and-fallback",
         comparability_notes=(
@@ -176,14 +176,14 @@ CATALOG: tuple[Indicator, ...] = (
         primary_source=SourceRef(
             system="world_bank",
             code="SL.UEM.NEET.ZS",
-            verified="unverified",
-            coverage="All ten panel economies; annual; sparse for some economies",
+            verified="confirmed",
+            coverage="All ten panel economies; annual; sparse for some economies (verified live 2026-08-19)",
         ),
         fallback_source=SourceRef(
             system="ilostat",
-            code="TBD-S05",
-            verified="unverified",
-            coverage="ILOSTAT NEET series to be identified during the S05 audit; definition variants exist",
+            code="DF_EIP_NEET_SEX_RT",
+            verified="confirmed",
+            coverage="ILOSTAT SDMX NEET rate by sex (EIP); filter SEX_T (verified live 2026-08-19)",
         ),
         fallback_status="primary-and-fallback",
         comparability_notes=(
@@ -257,14 +257,14 @@ CATALOG: tuple[Indicator, ...] = (
         primary_source=SourceRef(
             system="world_bank",
             code="FX.OWN.TOTL.ZS",
-            verified="unverified",
-            coverage="Global Findex survey years only (triennial, e.g. 2011/2014/2017/2021)",
+            verified="confirmed",
+            coverage="Global Findex survey years only (2011/2014/2017/2021/2025 waves; verified live 2026-08-19)",
         ),
         fallback_source=SourceRef(
             system="world_bank",
             code="FX.OWN.TOTL.FE.ZS",
-            verified="unverified",
-            coverage="Female variant for the gender gap; same survey years; verify variant codes in S05",
+            verified="confirmed",
+            coverage="Female variant for the gender gap; same survey years (verified live 2026-08-19)",
         ),
         fallback_status="primary-and-fallback",
         comparability_notes=(
@@ -283,12 +283,9 @@ CATALOG: tuple[Indicator, ...] = (
         seasonal_adjustment="not_seasonally_adjusted",
         primary_source=SourceRef(
             system="world_bank",
-            code="TBD-S05",
-            verified="unverified",
-            coverage=(
-                "Global Findex survey years, case-study economies; exact digital-payments "
-                "series code to be confirmed during the S05 source audit"
-            ),
+            code="g20.any",
+            verified="confirmed",
+            coverage="Global Findex 'Made or received a digital payment (% age 15+)'; survey years only (verified live 2026-08-19)",
         ),
         fallback_source=None,
         fallback_status="case-study-reserve",

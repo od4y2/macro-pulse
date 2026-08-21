@@ -22,7 +22,7 @@ def _resolve_source(
     """Find or create the source_catalog row for this fetch."""
     entry = (
         session.query(SourceCatalogEntry)
-        .filter_by(system="fred", code=series.series_id, role="primary")
+        .filter_by(system=series.system, code=series.series_id, role="primary")
         .one_or_none()
     )
     if entry is not None:
@@ -31,7 +31,7 @@ def _resolve_source(
     if indicator is None:
         raise PersistError(f"indicator {indicator_id!r} not registered")
     entry = SourceCatalogEntry(
-        system="fred",
+        system=series.system,
         code=series.series_id,
         role="primary",
         # live fetches verify the code exists; mocked fetches do not

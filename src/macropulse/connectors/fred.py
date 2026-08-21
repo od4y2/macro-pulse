@@ -21,11 +21,16 @@ Provenance notes (traceability):
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from typing import Any
 
 import httpx
+
+from macropulse.connectors.base import (
+    ConnectorError,
+    FetchedPoint,
+    FetchedSeries,
+)
 
 FRED_BASE_URL = "https://api.stlouisfed.org/fred/series/observations"
 
@@ -35,28 +40,6 @@ FRED_MISSING_VALUE = "."
 # Default country for FRED series: FRED codes in the S02 catalog are
 # US series or mirrors. Non-US mirrors must pass country_iso3 explicitly.
 FRED_DEFAULT_COUNTRY = "USA"
-
-
-class ConnectorError(RuntimeError):
-    """Raised when a source response cannot be trusted or parsed."""
-
-
-@dataclass(frozen=True)
-class FetchedPoint:
-    period: date
-    value: float | None
-    missing_reason: str | None
-    vintage: date
-
-
-@dataclass(frozen=True)
-class FetchedSeries:
-    series_id: str
-    country_iso3: str
-    evidence_label: str  # "real" (live) or "mocked" (no-key fixture)
-    retrieval_time: datetime
-    points: tuple[FetchedPoint, ...]
-    raw_payload: str  # exact provider response, preserved for raw store
 
 
 def parse_fred_observations(payload: str, series_id: str) -> list[FetchedPoint]:
@@ -184,6 +167,7 @@ class FredConnector:
             points = [p for p in points if p.period <= observation_end]
 
         return FetchedSeries(
+            system="fred",
             series_id=series_id,
             country_iso3=country_iso3,
             evidence_label=label,
