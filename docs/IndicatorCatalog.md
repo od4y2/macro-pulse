@@ -36,18 +36,20 @@ Fallback statuses: `primary-and-fallback` (fallback defined),
 `primary-only` (no acceptable fallback yet - single point of failure),
 `case-study-reserve` (sourcing deferred to S12).
 
-## Verification honesty
+## Verification status (updated after live audits, 2026-08-19)
 
-Codes are marked `confirmed` only when they are long-established, widely
-documented identifiers; everything else is `unverified` and must be
-confirmed against the live APIs in S04/S05 before production use.
-As of S02, 7 source references await live verification:
+Every catalog code has been verified against its live API (S05 World
+Bank/ILOSTAT audit + FRED follow-up with a real key): 18/18 probes OK -
+see `evidence/S05/live-source-audit.txt` and
+`PYTHONPATH=src python scripts/audit_sources.py` to reproduce. Corrections
+made from live evidence:
 
-- gdp_real_growth fallback: FRED `CLVMNACSCAB1GQ` (DEU GDP mirror)
-- youth_unemployment_rate fallback: ILOSTAT `SDG_0811_SEX_AGE_RT`
-- neet_rate primary: WB `SL.UEM.NEET.ZS`; fallback: ILOSTAT code TBD-S05
-- account_ownership_pct primary: WB `FX.OWN.TOTL.ZS`; fallback: `FX.OWN.TOTL.FE.ZS`
-- digital_payments_made_pct primary: WB Findex code TBD-S05
+- digital_payments_made_pct primary: WB `g20.any` (was TBD)
+- youth_unemployment_rate fallback: ILOSTAT `DF_SDG_0852_SEX_AGE_RT`
+  (S02's SDG_0811 guess was wrong - that is GDP growth)
+- neet_rate fallback: ILOSTAT `DF_EIP_NEET_SEX_RT` (was TBD)
+- gdp_real_growth fallback: FRED `CLVMNACSCAB1GQDE` (S02's guess was
+  missing the DE country suffix)
 
 ## Comparability rules (enforced at catalog level)
 

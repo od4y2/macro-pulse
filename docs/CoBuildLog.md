@@ -31,3 +31,9 @@ Append student decisions, AI assistance, manual verification, and learning evide
 - AI assistance: drafted worldbank.py + ilostat.py connectors, shared connector base, source-generic raw persistence, 24 tests, reproducible audit script; corrected the catalog with live-verified codes.
 - Manual verification: live audit output inspected line-by-line (14/14 OK); null-value patterns confirmed for Findex sparse series; dataflow registry consulted for correct ILOSTAT codes.
 - Learning evidence: the live audit caught three bugs mocked tests missed (WB date param, ILOSTAT timeout, lowercase ISO3 acceptance) - why live verification beats mocks alone; and the unverified-flag discipline caught a genuinely wrong ILOSTAT code from S02.
+
+## S05 follow-up: live FRED verification (2026-08-19)
+- Student decisions: provided the FRED API key; asked for verification.
+- AI assistance: wrote the key into gitignored `.env.local` after the user's manual edit did not land (file still had the placeholder); live-verified all FRED codes; corrected the invalid German GDP mirror code via FRED series search.
+- Manual verification: audit output inspected - 18/18 OK including FRED live mode.
+- Learning evidence: live verification again caught a wrong code (CLVMNACSCAB1GQ missing the DE suffix) that looked plausible on paper.

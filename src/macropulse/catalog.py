@@ -70,9 +70,9 @@ CATALOG: tuple[Indicator, ...] = (
         ),
         fallback_source=SourceRef(
             system="fred",
-            code="CLVMNACSCAB1GQ",
-            verified="unverified",
-            coverage="Germany only (Eurostat via FRED); other economies lack usable FRED GDP mirrors",
+            code="CLVMNACSCAB1GQDE",
+            verified="confirmed",
+            coverage="Germany only (Eurostat via FRED, quarterly SA); other economies lack usable FRED GDP mirrors (verified live 2026-08-19)",
         ),
         fallback_status="primary-and-fallback",
         comparability_notes=(

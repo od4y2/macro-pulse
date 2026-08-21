@@ -1,8 +1,12 @@
-# Source audit 2026-08-21T03:00:59.258086+00:00
+# Source audit 2026-08-21T03:09:23.671895+00:00
 probe country: USA
+fred live mode: True
 OK    gdp_real_growth              primary  world_bank  NY.GDP.MKTP.KD.ZG        points=6 non-null=6
+OK    gdp_real_growth              fallback fred        CLVMNACSCAB1GQDE         points=142 non-null=142
 OK    cpi_inflation                primary  world_bank  FP.CPI.TOTL.ZG           points=6 non-null=5
+OK    cpi_inflation                fallback fred        CPIAUCSL                 points=955 non-null=954
 OK    unemployment_rate            primary  world_bank  SL.UEM.TOTL.ZS           points=6 non-null=6
+OK    unemployment_rate            fallback fred        UNRATE                   points=943 non-null=942
 OK    youth_unemployment_rate      primary  world_bank  SL.UEM.1524.ZS           points=6 non-null=6
 OK    youth_unemployment_rate      fallback ilostat     DF_SDG_0852_SEX_AGE_RT   points=18 non-null=18
 OK    neet_rate                    primary  world_bank  SL.UEM.NEET.ZS           points=6 non-null=6
@@ -14,4 +18,5 @@ OK    account_ownership_pct        primary  world_bank  FX.OWN.TOTL.ZS          
 OK    account_ownership_pct        fallback world_bank  FX.OWN.TOTL.FE.ZS        points=6 non-null=2
 OK    digital_payments_made_pct    primary  world_bank  g20.any                  points=6 non-null=1
 OK    health_expenditure_pct_gdp   primary  world_bank  SH.XPD.CHEX.GD.ZS        points=6 non-null=4
+OK    policy_rate                  primary  fred        FEDFUNDS                 points=865 non-null=865
 # failures: 0

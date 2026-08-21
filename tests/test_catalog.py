@@ -34,9 +34,13 @@ def test_report_renders_and_flags_unverified() -> None:
     report = render_report()
     assert "MacroPulse indicator catalog" in report
     assert "awaiting live verification" in report
+    # As of the 2026-08-19 live audits (S05 + FRED follow-up) every catalog
+    # code has been verified against its live API; the count must reflect
+    # the catalog exactly, whatever it is.
     n_unverified = len(catalog.indicators_needing_verification())
-    assert n_unverified > 0  # honesty: we know some codes are unverified
     assert f"(S04/S05): {n_unverified}" in report
+    if n_unverified == 0:
+        assert "  - " not in report.split("awaiting live verification")[1]
 
 
 # --- Boundary cases ----------------------------------------------------------
