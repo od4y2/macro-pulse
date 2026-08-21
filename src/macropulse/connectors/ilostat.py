@@ -142,6 +142,12 @@ class IlostatConnector:
             points = [p for p in points if p.period.year >= start_year]
         if end_year is not None:
             points = [p for p in points if p.period.year <= end_year]
+        # SDMX CSV carries no release timestamp: the vintage of every point
+        # is the retrieval date (snapshot semantics).
+        points = [
+            FetchedPoint(p.period, p.value, p.missing_reason, retrieval_time.date())
+            for p in points
+        ]
 
         return FetchedSeries(
             system="ilostat",

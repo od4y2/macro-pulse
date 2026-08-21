@@ -12,7 +12,7 @@
 - [x] S03 - Architecture and Database Contract (2026-08-19): 11-table PostgreSQL schema (ORM + Alembic migration `bcc78be651f0` applied to live docker-compose DB), API contract schemas, data flow/module boundaries in `docs/DatabaseContract.md`; 18 new tests (52/52 total, 6 live-DB). Docker gap closed (29.7.2). Evidence: `evidence/S03/db-contract.md`.
 - [x] S04 - FRED Connector Vertical Slice (2026-08-19): `FredConnector` (live + deterministic no-key modes, shared parser), raw-store persistence, 18 new tests (70/70 total) incl. httpx.MockTransport live-path tests and 3 live-DB persistence tests. No live FRED call made (no key) - catalog FRED codes still unverified live. Evidence: `evidence/S04/fred-slice.md`.
 - [x] S05 - World Bank and ILOSTAT Connectors (2026-08-19): WorldBankConnector + IlostatConnector (live, no key), shared connector base, source-generic raw persistence; live audit 14/14 catalog codes OK (`scripts/audit_sources.py`) with 2 catalog corrections (g20.any, DF_SDG_0852_SEX_AGE_RT/DF_EIP_NEET_SEX_RT). 24 new tests (94/94). Evidence: `evidence/S05/`.
-- [ ] S06 - Normalization Pipeline
+- [x] S06 - Normalization Pipeline (2026-08-19): pure `normalize_series()` + `persist_normalized()` in `src/macropulse/pipeline/normalize.py` unifying country panel, periods, canonical units (values never converted), median-gap frequency inference, per-series seasonal adjustment, per-point vintage, explicit missingness; rules doc `docs/NormalizationRules.md`; WB/ILOSTAT vintage=period bug fixed to retrieval-date snapshot semantics; 23 new tests (117/117). Evidence: `evidence/S06/`.
 - [ ] S07 - Quality, Missingness, and Vintage Control
 - [ ] S08 - Time-Series Transformations
 - [ ] S09 - Robust Standardization and Coverage

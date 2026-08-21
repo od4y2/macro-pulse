@@ -37,3 +37,9 @@ Append student decisions, AI assistance, manual verification, and learning evide
 - AI assistance: wrote the key into gitignored `.env.local` after the user's manual edit did not land (file still had the placeholder); live-verified all FRED codes; corrected the invalid German GDP mirror code via FRED series search.
 - Manual verification: audit output inspected - 18/18 OK including FRED live mode.
 - Learning evidence: live verification again caught a wrong code (CLVMNACSCAB1GQ missing the DE suffix) that looked plausible on paper.
+
+## S06: normalization pipeline (2026-08-19)
+- Student decisions: none this unit (continued per approved plan).
+- AI assistance: designed the rule table (docs/NormalizationRules.md); implemented pure `normalize_series()` + `persist_normalized()`; found and fixed the WB/ILOSTAT vintage=period bug flagged during S05 review; wrote 23 tests including DB roundtrip and duplicate-identity rejection.
+- Manual verification: acceptance run inspected - 117/117 tests, ruff clean, smoke passed.
+- Learning evidence: the vintage bug showed why "documented semantics" must match code before downstream layers build on them - normalization would have silently produced wrong vintages for two of three sources.

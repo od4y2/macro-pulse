@@ -125,6 +125,12 @@ class WorldBankConnector:
             points = [p for p in points if p.period.year >= start_year]
         if end_year is not None:
             points = [p for p in points if p.period.year <= end_year]
+        # The WB API serves the current snapshot only: the vintage of every
+        # point is the retrieval date, not the observation period.
+        points = [
+            FetchedPoint(p.period, p.value, p.missing_reason, retrieval_time.date())
+            for p in points
+        ]
 
         return FetchedSeries(
             system="world_bank",
