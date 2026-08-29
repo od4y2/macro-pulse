@@ -1,0 +1,16 @@
+# S11 acceptance run - 2026-08-29 08:32 UTC
+## Full suite
+.......................................................................  [100%]
+287 passed in 4.02s
+
+## ruff check (unit-intended files)
+All checks passed!
+
+## ruff format --check (unit-intended files)
+3 files already formatted
+
+## smoke (catalog + lens validation)
+catalog OK: 12 indicators; lens OK; aux: FX.OWN.TOTL.FE.ZS
+
+## python -m macropulse.smoke (PYTHONPATH=src; bare invocation hits the tracked E01 .venv defect)
+MacroPulse starter smoke test passed

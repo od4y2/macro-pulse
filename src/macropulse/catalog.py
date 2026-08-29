@@ -275,13 +275,13 @@ CATALOG: tuple[Indicator, ...] = (
             system="world_bank",
             code="FX.OWN.TOTL.ZS",
             verified="confirmed",
-            coverage="Global Findex survey years only (2011/2014/2017/2021/2025 waves; verified live 2026-08-19)",
+            coverage="Global Findex survey years only (2011/2014/2017/2021/2024 waves; re-verified live 2026-08-29)",
         ),
         fallback_source=SourceRef(
             system="world_bank",
             code="FX.OWN.TOTL.FE.ZS",
             verified="confirmed",
-            coverage="Female variant for the gender gap; same survey years (verified live 2026-08-19)",
+            coverage="Female variant for the gender gap; same survey years (re-verified live 2026-08-29)",
         ),
         fallback_status="primary-and-fallback",
         comparability_notes=(
@@ -381,33 +381,44 @@ def validate_catalog() -> list[str]:
                 f"{ind.indicator_id}: invalid fallback_status {ind.fallback_status!r}"
             )
         if ind.direction not in DIRECTIONS:
-            problems.append(
-                f"{ind.indicator_id}: invalid direction {ind.direction!r}"
-            )
+            problems.append(f"{ind.indicator_id}: invalid direction {ind.direction!r}")
         if not ind.unit or not ind.comparability_notes or not ind.limitations:
-            problems.append(f"{ind.indicator_id}: unit, comparability, or limitations missing")
+            problems.append(
+                f"{ind.indicator_id}: unit, comparability, or limitations missing"
+            )
 
         for ref in (ind.primary_source, ind.fallback_source):
             if ref is None:
                 continue
             if ref.system not in SOURCE_SYSTEMS:
-                problems.append(f"{ind.indicator_id}: unknown source system {ref.system!r}")
+                problems.append(
+                    f"{ind.indicator_id}: unknown source system {ref.system!r}"
+                )
             if ref.verified not in VERIFICATION_STATUSES:
                 problems.append(
                     f"{ind.indicator_id}: invalid verification status {ref.verified!r}"
                 )
             if not ref.code or not ref.coverage:
-                problems.append(f"{ind.indicator_id}: source ref missing code or coverage")
+                problems.append(
+                    f"{ind.indicator_id}: source ref missing code or coverage"
+                )
             if any(ch.isspace() for ch in ref.code):
                 problems.append(
                     f"{ind.indicator_id}: source code {ref.code!r} contains whitespace "
                     "(notes belong in coverage)"
                 )
 
-        if ind.fallback_status == "primary-and-fallback" and ind.fallback_source is None:
-            problems.append(f"{ind.indicator_id}: fallback_status requires a fallback_source")
+        if (
+            ind.fallback_status == "primary-and-fallback"
+            and ind.fallback_source is None
+        ):
+            problems.append(
+                f"{ind.indicator_id}: fallback_status requires a fallback_source"
+            )
         if ind.fallback_status == "primary-only" and ind.fallback_source is not None:
-            problems.append(f"{ind.indicator_id}: primary-only must not define a fallback_source")
+            problems.append(
+                f"{ind.indicator_id}: primary-only must not define a fallback_source"
+            )
 
     return problems
 

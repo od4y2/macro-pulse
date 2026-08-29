@@ -67,3 +67,9 @@ Append student decisions, AI assistance, manual verification, and learning evide
 - AI assistance: designed the component-first RQ1 lens (profiles, three documented relationships, enrollment reported-not-combined); implemented build/series/vintage-divergence functions with coherence and missingness rules; live demo on real WB+ILOSTAT data for USA/ZAF/BRA.
 - Manual verification: acceptance run inspected - 261/261 tests, ruff clean, smoke passed; live profiles inspected (ZAF gap 28pp vs neet-excess 2.3pp shows why both gap and withdrawal measures matter; misalignment produced honest Nones).
 - Learning evidence: the enrollment decision shows the non-claims boundary governing analysis design - the moment a formula encodes "more education means less youth unemployment," the platform has made a causal claim by arithmetic.
+
+## S11: digital reach and inclusion gap (2026-08-29)
+- Student decisions: none this unit (continued per approved plan).
+- AI assistance: designed the two-dimensional RQ2 lens on the S10 component-first pattern (reach levels vs inclusion gaps, Findex female source as aux component); implemented build/rank-covariation/measurement-gap with coherence and missingness rules; ran the live 10-economy WB demo with observed-period alignment; corrected the catalog's Findex wave years against the live source.
+- Manual verification: acceptance run inspected - 287/287 tests, ruff check + format clean, smoke passed; live panel inspected (MEX -30.1pp account-internet with -5.6pp gender gap - levels alone would not show this; JPN aligned to 2021 shows the stalest-dimension binding).
+- Learning evidence: the placeholder-rows finding shows why "returned" and "observed" are different words - an API row with a NULL value looks like data in a response list, and treating returned periods as observations would have fabricated a full panel of nothing.
