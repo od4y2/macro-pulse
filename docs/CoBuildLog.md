@@ -43,3 +43,9 @@ Append student decisions, AI assistance, manual verification, and learning evide
 - AI assistance: designed the rule table (docs/NormalizationRules.md); implemented pure `normalize_series()` + `persist_normalized()`; found and fixed the WB/ILOSTAT vintage=period bug flagged during S05 review; wrote 23 tests including DB roundtrip and duplicate-identity rejection.
 - Manual verification: acceptance run inspected - 117/117 tests, ruff clean, smoke passed.
 - Learning evidence: the vintage bug showed why "documented semantics" must match code before downstream layers build on them - normalization would have silently produced wrong vintages for two of three sources.
+
+## S07: quality, missingness, vintage control (2026-08-29)
+- Student decisions: none this unit (continued per approved plan).
+- AI assistance: designed the grade/flag vocabularies and priority rules; implemented assessment/missingness/vintage modules; enabled ALFRED realtime windows in the FRED connector (live-only); rekeyed S06 duplicate semantics to (period, vintage); live-verified realtime queries including a genuine PAYEMS revision chain (-300K on Jan 2023).
+- Manual verification: acceptance run inspected - 159/159 tests, ruff clean, smoke passed; live ALFRED output reviewed (vintage stamps track windows; revision deltas computed from real values).
+- Learning evidence: the reserved-grade decision (preliminary/estimated never emitted) shows the no-fabrication principle applying to metadata, not just values - a plausible-looking label without source backing is still a fabrication.

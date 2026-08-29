@@ -54,3 +54,42 @@ def session():
     finally:
         s.close()
         engine.dispose()
+
+
+@pytest.fixture()
+def seeded(session):
+    """Seed the minimal FK parents: USA, gdp_real_growth, one WB source.
+
+    Shared by S06/S07 persistence tests (test_normalize.py,
+    test_vintage_control.py).
+    """
+    from macropulse.catalog import CATALOG
+    from macropulse.db.models import Country, Indicator, SourceCatalogEntry
+
+    ind = next(i for i in CATALOG if i.indicator_id == "gdp_real_growth")
+    session.add(Country(iso3="USA", name="United States", rationale="test"))
+    session.add(
+        Indicator(
+            indicator_id=ind.indicator_id,
+            name=ind.name,
+            module=ind.module,
+            unit=ind.unit,
+            frequency=ind.frequency,
+            seasonal_adjustment=ind.seasonal_adjustment,
+            fallback_status=ind.fallback_status,
+            comparability_notes=ind.comparability_notes,
+            limitations=ind.limitations,
+        )
+    )
+    session.flush()
+    source = SourceCatalogEntry(
+        system="world_bank",
+        code="NY.GDP.MKTP.KD.ZG",
+        role="primary",
+        verified="confirmed",
+        coverage="test",
+        indicator_id=ind.indicator_id,
+    )
+    session.add(source)
+    session.commit()
+    return source

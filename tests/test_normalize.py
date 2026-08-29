@@ -102,9 +102,17 @@ def test_infer_frequency_rejects_inconsistent():
         infer_frequency(pts)
 
 
-def test_infer_frequency_rejects_duplicates():
+def test_infer_frequency_tolerates_duplicate_periods():
+    # A vintage chain repeats the same period under different vintages
+    # (ALFRED realtime queries). Inference collapses duplicates; the true
+    # duplicate - same (period, vintage) - is rejected in normalize_series.
+    pts = annual_points({2024: 1.0}) + annual_points({2024: 2.0, 2025: 3.0})
+    assert infer_frequency(pts) == "annual"
+
+
+def test_infer_frequency_rejects_single_repeated_period():
     pts = annual_points({2024: 1.0}) + annual_points({2024: 2.0})
-    with pytest.raises(NormalizationError, match="duplicate periods"):
+    with pytest.raises(NormalizationError, match="one period"):
         infer_frequency(pts)
 
 
@@ -242,6 +250,38 @@ def test_normalize_fred_point_vintage_preserved():
     assert [r.vintage for r in records] == [date(2023, 4, 2), date(2024, 4, 3)]
 
 
+def test_normalize_accepts_vintage_chain():
+    # The same period under two vintages is a revision chain, not a
+    # duplicate (S07 ALFRED realtime support).
+    series = make_series(
+        [
+            FetchedPoint(date(2023, 1, 1), 5.2, None, date(2023, 4, 2)),
+            FetchedPoint(date(2023, 1, 1), 5.4, None, date(2024, 4, 3)),
+            FetchedPoint(date(2024, 1, 1), 4.8, None, date(2024, 4, 3)),
+        ],
+        system="fred",
+        series_id="UNRATE",
+    )
+    records = normalize_series(series, "unemployment_rate", frequency="annual")
+    assert len(records) == 3
+    assert records[0].value == 5.2 and records[1].value == 5.4
+
+
+def test_normalize_rejects_duplicate_period_vintage():
+    # Same (period, vintage) twice is a true duplicate - rejected.
+    series = make_series(
+        [
+            FetchedPoint(date(2023, 1, 1), 5.2, None, date(2023, 4, 2)),
+            FetchedPoint(date(2023, 1, 1), 5.3, None, date(2023, 4, 2)),
+            FetchedPoint(date(2024, 1, 1), 4.8, None, date(2024, 4, 3)),
+        ],
+        system="fred",
+        series_id="UNRATE",
+    )
+    with pytest.raises(NormalizationError, match=r"duplicate \(period, vintage\)"):
+        normalize_series(series, "unemployment_rate", frequency="annual")
+
+
 def test_normalize_source_fields_recorded():
     series = make_series(
         annual_points({2022: 1.0, 2023: 1.1}),
@@ -254,42 +294,6 @@ def test_normalize_source_fields_recorded():
 
 
 # --- database integration -------------------------------------------------
-
-
-@pytest.fixture()
-def seeded(session):
-    """Seed the minimal FK parents: one country, one indicator, one source."""
-    from macropulse.db.models import Country, Indicator, SourceCatalogEntry
-
-    ind = catalog_indicator("gdp_real_growth")
-    session.add(
-        Country(iso3="USA", name="United States", rationale="test")
-    )
-    session.add(
-        Indicator(
-            indicator_id=ind.indicator_id,
-            name=ind.name,
-            module=ind.module,
-            unit=ind.unit,
-            frequency=ind.frequency,
-            seasonal_adjustment=ind.seasonal_adjustment,
-            fallback_status=ind.fallback_status,
-            comparability_notes=ind.comparability_notes,
-            limitations=ind.limitations,
-        )
-    )
-    session.flush()
-    source = SourceCatalogEntry(
-        system="world_bank",
-        code="NY.GDP.MKTP.KD.ZG",
-        role="primary",
-        verified="confirmed",
-        coverage="test",
-        indicator_id=ind.indicator_id,
-    )
-    session.add(source)
-    session.commit()
-    return source
 
 
 def test_persist_normalized_roundtrip(session, seeded):

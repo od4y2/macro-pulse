@@ -79,14 +79,22 @@ def _months_between(a: date, b: date) -> int:
 
 
 def infer_frequency(points: list[FetchedPoint]) -> str:
-    """Infer frequency from the median month gap of consecutive periods."""
+    """Infer frequency from the median month gap of consecutive periods.
+
+    Duplicate periods are collapsed before gap computation: a vintage chain
+    (the same period fetched under several vintages, e.g. via ALFRED
+    realtime queries) legitimately repeats periods. True duplicates - the
+    same (period, vintage) - are rejected by ``normalize_series``.
+    """
     if len(points) < 2:
         raise NormalizationError(
             "cannot infer frequency from fewer than 2 points; pass it explicitly"
         )
-    periods = sorted(p.period for p in points)
-    if len(set(periods)) != len(periods):
-        raise NormalizationError("duplicate periods in series")
+    periods = sorted({p.period for p in points})
+    if len(periods) < 2:
+        raise NormalizationError(
+            "all points share one period; pass frequency explicitly"
+        )
     gaps = [_months_between(a, b) for a, b in pairwise(periods)]
     typical = median(gaps)
     if typical != int(typical) or int(typical) not in _FREQUENCY_BY_GAP:
@@ -138,14 +146,15 @@ def normalize_series(
             f"invalid evidence label {series.evidence_label!r}"
         )
 
-    seen: set[date] = set()
+    seen: set[tuple[date, date]] = set()
     records: list[NormalizedRecord] = []
     for point in series.points:
-        if point.period in seen:
+        identity = (point.period, point.vintage)
+        if identity in seen:
             raise NormalizationError(
-                f"duplicate period {point.period} in {series.series_id}"
+                f"duplicate (period, vintage) {identity} in {series.series_id}"
             )
-        seen.add(point.period)
+        seen.add(identity)
         if point.value is None and not point.missing_reason:
             raise NormalizationError(
                 f"missing value at {point.period} has no missing_reason "

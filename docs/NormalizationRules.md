@@ -15,7 +15,8 @@ series' own `retrieval_time`).
 | Country | `series.country_iso3` must be in the locked S01 panel (10 economies). No case-folding or aliasing at this layer — connectors already emit ISO3. | `NormalizationError` if outside panel |
 | Period | Taken verbatim from the connector point. Connectors already unify dates (annual → Jan 1 of year; FRED monthly/quarterly → period start). | — |
 | Unit | The catalog indicator's unit is canonical; values pass through **unchanged**. No unit conversion happens here (index→YoY etc. is S08 derived-metric territory and must be labelled). | — |
-| Frequency | Inferred from the **median month-gap** between consecutive periods: 1 → `monthly`, 3 → `quarterly`, 12 → `annual`. Caller may pass explicitly (must be a legal `FREQUENCIES` value). | Error if < 2 points and not given; error if median gap is not 1/3/12; error on duplicate periods |
+| Frequency | Inferred from the **median month-gap** between consecutive distinct periods: 1 -> `monthly`, 3 -> `quarterly`, 12 -> `annual`. Caller may pass explicitly (must be a legal `FREQUENCIES` value). Duplicate periods are collapsed before gap computation - a vintage chain (same period under multiple vintages, e.g. ALFRED realtime queries) legitimately repeats periods. | Error if < 2 distinct periods and not given; error if median gap is not 1/3/12 |
+| Period identity | True duplicates are the same `(period, vintage)` pair twice. | Error on duplicate (period, vintage) |
 | Seasonal adjustment | Caller-supplied, defaulting to the catalog indicator's value. Sources differ (e.g. FRED CPI is SA while WB CPI is NSA), so the *applied* value is stored per observation. | Error if not a legal `SEASONAL_ADJUSTMENTS` value |
 | Vintage | Per-point: FRED points carry `realtime_start`; WB/ILOSTAT points carry the retrieval date (snapshot semantics — the APIs serve only the current revision). | — |
 | Release time | `retrieval_time` of the fetch, stored per record. **Documented proxy**: none of the three endpoints expose a per-observation release timestamp. Refined in S07 (release calendar / vintage control). | — |
@@ -58,4 +59,6 @@ without `missing_reason` is rejected by `ck_missing_requires_reason`.
   histories may be truncated at fetch time (connector-level follow-up).
 - ILOSTAT SDMX filtering is client-side; the full dataflow is downloaded
   (performance follow-up, correctness unaffected).
-- `release_time` is a retrieval-time proxy until S07.
+- `release_time` is a retrieval-time proxy; S07 adds vintage control and
+  grading but per-observation release timestamps still require the release
+  calendar (S03 table, not yet populated) - see docs/QualityGovernance.md.

@@ -15,7 +15,11 @@ Provenance notes (traceability):
 - FRED's plain observations endpoint does not expose first-release
   timestamps, so ``release_time`` is set equal to ``retrieval_time`` and the
   limitation is recorded here and in the S02 catalog limitations. True
-  vintage/release history requires ALFRED realtime queries (S07).
+  vintage/release history is available via ALFRED realtime queries, which
+  ``fetch_series(realtime_start=..., realtime_end=...)`` enables (S07): the
+  same endpoint restricted to a realtime window returns the values as they
+  were known in that window, so repeated calls build a vintage chain where
+  the same period legitimately appears under multiple vintages.
 """
 
 from __future__ import annotations
@@ -132,9 +136,24 @@ class FredConnector:
         country_iso3: str = FRED_DEFAULT_COUNTRY,
         observation_start: date | None = None,
         observation_end: date | None = None,
+        realtime_start: date | None = None,
+        realtime_end: date | None = None,
     ) -> FetchedSeries:
+        """Fetch one FRED series.
+
+        ``realtime_start``/``realtime_end`` restrict the result to the
+        ALFRED realtime window: values as known during that window. Without
+        them FRED returns current values (realtime window = today..9999).
+        Realtime queries are live-only: the no-key fixture has no vintage
+        dimension, so requesting one without a key is an error rather than
+        a silent mock.
+        """
         if not series_id or not series_id.strip():
             raise ConnectorError("series_id must be non-empty")
+        if not self.live and (realtime_start is not None or realtime_end is not None):
+            raise ConnectorError(
+                f"{series_id}: realtime (ALFRED) queries require a live API key"
+            )
 
         retrieval_time = datetime.now(UTC)
         if self.live:
@@ -147,6 +166,10 @@ class FredConnector:
                 params["observation_start"] = observation_start.isoformat()
             if observation_end is not None:
                 params["observation_end"] = observation_end.isoformat()
+            if realtime_start is not None:
+                params["realtime_start"] = realtime_start.isoformat()
+            if realtime_end is not None:
+                params["realtime_end"] = realtime_end.isoformat()
             with httpx.Client(transport=self._transport) as client:
                 response = client.get(self._base_url, params=params)
             if response.status_code != 200:

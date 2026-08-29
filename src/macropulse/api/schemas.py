@@ -17,6 +17,9 @@ from macropulse.scope import EVIDENCE_LABELS
 EvidenceLabel = Literal["real", "synthetic", "mocked", "cached", "external"]
 
 _QUALITY_GRADES = ("ungraded", "official", "preliminary", "revised", "estimated", "flagged")
+# Public alias: the quality module (S07) imports the same tuple so the API
+# contract stays the single source of truth for the grade vocabulary.
+QUALITY_GRADES = _QUALITY_GRADES
 
 
 class CountryOut(BaseModel):
