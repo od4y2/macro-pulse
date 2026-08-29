@@ -49,3 +49,9 @@ Append student decisions, AI assistance, manual verification, and learning evide
 - AI assistance: designed the grade/flag vocabularies and priority rules; implemented assessment/missingness/vintage modules; enabled ALFRED realtime windows in the FRED connector (live-only); rekeyed S06 duplicate semantics to (period, vintage); live-verified realtime queries including a genuine PAYEMS revision chain (-300K on Jan 2023).
 - Manual verification: acceptance run inspected - 159/159 tests, ruff clean, smoke passed; live ALFRED output reviewed (vintage stamps track windows; revision deltas computed from real values).
 - Learning evidence: the reserved-grade decision (preliminary/estimated never emitted) shows the no-fabrication principle applying to metadata, not just values - a plausible-looking label without source backing is still a fabrication.
+
+## S08: time-series transformations (2026-08-29)
+- Student decisions: none this unit (continued per approved plan).
+- AI assistance: extended the audit-era transforms starter into the five families (YoY, MoM, pp-change, annualization, rolling mean) with a closed missing-reason vocabulary; built the derived-metric engine on the untouched S03 schema; wrote 40 tests including a full DB vertical slice (normalized -> latest vintage -> yoy -> derived rows with lineage).
+- Manual verification: acceptance run inspected - 199/199 tests, ruff clean, smoke passed; lineage and version rows inspected in the DB slice.
+- Learning evidence: the zero_base/non_positive_base decision shows missingness policy extending to derived layers - "the number is undefined" must be recorded, not papered over with 0 or inf.
