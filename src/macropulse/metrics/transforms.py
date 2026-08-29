@@ -114,6 +114,13 @@ FORMULAS: dict[str, str] = {
         "(frequency step): sum(v) / W. Every window member must exist with "
         "a non-NULL value; partial windows are missing, never half-computed."
     ),
+    "robust_z": (
+        "Robust fixed-window standardization (S09): "
+        "(v_t - median(window)) / MAD(window) over the trailing N "
+        "consecutive periods (frequency step), direction-adjusted so "
+        "positive = favorable; window occupancy >= 3 non-missing members. "
+        "Zero MAD is missing (zero_scale), never fabricated."
+    ),
 }
 
 

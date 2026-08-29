@@ -23,6 +23,11 @@ FREQUENCIES = ("monthly", "quarterly", "annual")
 
 SEASONAL_ADJUSTMENTS = ("seasonally_adjusted", "not_seasonally_adjusted", "varies")
 
+# Presentation convention (S09): how a HIGHER value reads for the dashboard
+# lenses. This is an interpretation aid, not a welfare judgment; "neutral"
+# indicators are published unadjusted (score direction is meaningless).
+DIRECTIONS = ("higher_is_better", "lower_is_better", "neutral")
+
 VERIFICATION_STATUSES = ("confirmed", "unverified")
 
 FALLBACK_STATUSES = (
@@ -51,12 +56,16 @@ class Indicator(NamedTuple):
     fallback_status: str  # one of FALLBACK_STATUSES
     comparability_notes: str
     limitations: str
+    # One of DIRECTIONS (S09); defaults to "neutral" so partially
+    # constructed test entries stay valid, but catalog entries declare it.
+    direction: str = "neutral"
 
 
 CATALOG: tuple[Indicator, ...] = (
     # --- traditional-indicators -------------------------------------------
     Indicator(
         indicator_id="gdp_real_growth",
+        direction="higher_is_better",
         name="Real GDP growth (annual %)",
         module="traditional-indicators",
         unit="percent_per_year",
@@ -86,6 +95,7 @@ CATALOG: tuple[Indicator, ...] = (
     ),
     Indicator(
         indicator_id="cpi_inflation",
+        direction="lower_is_better",
         name="Consumer price inflation (annual %)",
         module="traditional-indicators",
         unit="percent_per_year",
@@ -112,6 +122,7 @@ CATALOG: tuple[Indicator, ...] = (
     ),
     Indicator(
         indicator_id="unemployment_rate",
+        direction="lower_is_better",
         name="Unemployment rate, total (% of labor force)",
         module="traditional-indicators",
         unit="percent",
@@ -142,6 +153,7 @@ CATALOG: tuple[Indicator, ...] = (
     # --- labor-slack-youth (RQ1) --------------------------------------------
     Indicator(
         indicator_id="youth_unemployment_rate",
+        direction="lower_is_better",
         name="Youth unemployment rate, ages 15-24 (% of labor force)",
         module="labor-slack-youth",
         unit="percent",
@@ -168,6 +180,7 @@ CATALOG: tuple[Indicator, ...] = (
     ),
     Indicator(
         indicator_id="neet_rate",
+        direction="lower_is_better",
         name="Youth not in education, employment or training (NEET, % of youth)",
         module="labor-slack-youth",
         unit="percent",
@@ -194,6 +207,7 @@ CATALOG: tuple[Indicator, ...] = (
     ),
     Indicator(
         indicator_id="tertiary_enrollment",
+        direction="higher_is_better",
         name="School enrollment, tertiary (% gross)",
         module="labor-slack-youth",
         unit="percent_gross",
@@ -213,6 +227,7 @@ CATALOG: tuple[Indicator, ...] = (
     # --- digital-inclusion (RQ2) --------------------------------------------
     Indicator(
         indicator_id="internet_users_pct",
+        direction="higher_is_better",
         name="Individuals using the Internet (% of population)",
         module="digital-inclusion",
         unit="percent",
@@ -231,6 +246,7 @@ CATALOG: tuple[Indicator, ...] = (
     ),
     Indicator(
         indicator_id="mobile_subscriptions_per100",
+        direction="higher_is_better",
         name="Mobile cellular subscriptions (per 100 people)",
         module="digital-inclusion",
         unit="per_100_people",
@@ -249,6 +265,7 @@ CATALOG: tuple[Indicator, ...] = (
     ),
     Indicator(
         indicator_id="account_ownership_pct",
+        direction="higher_is_better",
         name="Account ownership at a financial institution or mobile-money provider (% of adults)",
         module="digital-inclusion",
         unit="percent_of_adults",
@@ -276,6 +293,7 @@ CATALOG: tuple[Indicator, ...] = (
     # --- payment-resilience-healthcare (RQ3) --------------------------------
     Indicator(
         indicator_id="digital_payments_made_pct",
+        direction="higher_is_better",
         name="Made or received digital payments in the past year (% of adults)",
         module="payment-resilience-healthcare",
         unit="percent_of_adults",
@@ -294,6 +312,7 @@ CATALOG: tuple[Indicator, ...] = (
     ),
     Indicator(
         indicator_id="health_expenditure_pct_gdp",
+        direction="higher_is_better",
         name="Current health expenditure (% of GDP)",
         module="payment-resilience-healthcare",
         unit="percent_of_gdp",
@@ -313,6 +332,7 @@ CATALOG: tuple[Indicator, ...] = (
     # --- vintage-transparency (RQ4, metadata-side) ---------------------------
     Indicator(
         indicator_id="policy_rate",
+        direction="neutral",
         name="Short-term policy/interest rate (%, end-of-period or daily)",
         module="traditional-indicators",
         unit="percent_per_annum",
@@ -359,6 +379,10 @@ def validate_catalog() -> list[str]:
         if ind.fallback_status not in FALLBACK_STATUSES:
             problems.append(
                 f"{ind.indicator_id}: invalid fallback_status {ind.fallback_status!r}"
+            )
+        if ind.direction not in DIRECTIONS:
+            problems.append(
+                f"{ind.indicator_id}: invalid direction {ind.direction!r}"
             )
         if not ind.unit or not ind.comparability_notes or not ind.limitations:
             problems.append(f"{ind.indicator_id}: unit, comparability, or limitations missing")

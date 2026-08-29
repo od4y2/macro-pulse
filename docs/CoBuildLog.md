@@ -55,3 +55,9 @@ Append student decisions, AI assistance, manual verification, and learning evide
 - AI assistance: extended the audit-era transforms starter into the five families (YoY, MoM, pp-change, annualization, rolling mean) with a closed missing-reason vocabulary; built the derived-metric engine on the untouched S03 schema; wrote 40 tests including a full DB vertical slice (normalized -> latest vintage -> yoy -> derived rows with lineage).
 - Manual verification: acceptance run inspected - 199/199 tests, ruff clean, smoke passed; lineage and version rows inspected in the DB slice.
 - Learning evidence: the zero_base/non_positive_base decision shows missingness policy extending to derived layers - "the number is undefined" must be recorded, not papered over with 0 or inf.
+
+## S09: robust standardization and coverage (2026-08-29)
+- Student decisions: none this unit (continued per approved plan).
+- AI assistance: designed the robust fixed-window scaling (median/MAD, recorded occupancy, zero_scale as missing), the catalog direction field with policy_rate neutral, ratio-of-sums panel coverage, and condition-based publication gates; added the robust_z formula + latest_vintage_records loader; live manual check on real WB unemployment USA/ZAF.
+- Manual verification: acceptance run inspected - 240/240 tests, ruff clean, smoke passed; live scores inspected for semantics (USA -0.47 vs ZAF 0.00 at very different unemployment levels proves the own-history semantics).
+- Learning evidence: the policy_rate-is-neutral decision shows the claims boundary applying to presentation conventions - a sign flip is a judgment about what counts as favorable, and judgment belongs to the reader, not the pipeline.

@@ -184,3 +184,63 @@ def test_duplicate_indicator_ids_rejected() -> None:
         assert any("duplicate indicator ids" in p for p in validate_catalog())
     finally:
         catalog.CATALOG = original
+
+
+# --- direction (S09) ----------------------------------------------------------
+
+def test_all_catalog_directions_valid() -> None:
+    from macropulse.catalog import CATALOG, DIRECTIONS
+
+    assert all(i.direction in DIRECTIONS for i in CATALOG)
+
+
+def test_direction_vocabulary() -> None:
+    from macropulse.catalog import DIRECTIONS
+
+    assert set(DIRECTIONS) == {
+        "higher_is_better", "lower_is_better", "neutral",
+    }
+
+
+def test_policy_rate_is_neutral() -> None:
+    # A policy rate is neither favorable nor unfavorable at any level;
+    # direction adjustment would be a judgment, so it stays neutral.
+    from macropulse.catalog import CATALOG
+
+    ind = next(i for i in CATALOG if i.indicator_id == "policy_rate")
+    assert ind.direction == "neutral"
+
+
+def test_labor_indicators_are_lower_is_better() -> None:
+    from macropulse.catalog import CATALOG
+
+    for indicator_id in (
+        "unemployment_rate", "youth_unemployment_rate", "neet_rate",
+        "cpi_inflation",
+    ):
+        ind = next(i for i in CATALOG if i.indicator_id == indicator_id)
+        assert ind.direction == "lower_is_better", indicator_id
+
+
+def test_invalid_direction_rejected() -> None:
+    from macropulse.catalog import Indicator, validate_catalog
+
+    original = catalog.CATALOG
+    ind = original[0]
+    try:
+        catalog.CATALOG = (
+            Indicator(
+                indicator_id=ind.indicator_id, name=ind.name, module=ind.module,
+                unit=ind.unit, frequency=ind.frequency,
+                seasonal_adjustment=ind.seasonal_adjustment,
+                primary_source=ind.primary_source,
+                fallback_source=ind.fallback_source,
+                fallback_status=ind.fallback_status,
+                comparability_notes=ind.comparability_notes,
+                limitations=ind.limitations,
+                direction="faster",
+            ),
+        )
+        assert any("invalid direction" in p for p in validate_catalog())
+    finally:
+        catalog.CATALOG = original

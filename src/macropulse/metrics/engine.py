@@ -27,15 +27,14 @@ class DeriveError(RuntimeError):
     """Raised when derived persistence violates the rules."""
 
 
-def latest_vintage_series(
+def latest_vintage_records(
     session, indicator_id: str, country_iso3: str
-) -> list[SeriesPoint]:
-    """Latest-vintage points for one (indicator, country), period order.
+) -> list[NormalizedObservation]:
+    """Latest-vintage ORM rows for one (indicator, country), period order.
 
-    Reads all vintages and keeps, per period, the newest one (revision
-    transparency: superseded vintages stay in the store; transforms
-    consume the current view). NULL values pass through with their
-    missing_reason so transforms surface them honestly.
+    Same current-view semantics as ``latest_vintage_series`` but returns
+    the full rows (evidence_label, vintage, quality_grade) for consumers
+    that need them - e.g. the S09 publication gates.
     """
     rows = (
         session.query(NormalizedObservation)
@@ -46,13 +45,26 @@ def latest_vintage_series(
     latest: dict[date, NormalizedObservation] = {}
     for row in rows:  # ordered oldest -> newest; last write wins
         latest[row.period] = row
+    return sorted(latest.values(), key=lambda r: r.period)
+
+
+def latest_vintage_series(
+    session, indicator_id: str, country_iso3: str
+) -> list[SeriesPoint]:
+    """Latest-vintage points for one (indicator, country), period order.
+
+    Reads all vintages and keeps, per period, the newest one (revision
+    transparency: superseded vintages stay in the store; transforms
+    consume the current view). NULL values pass through with their
+    missing_reason so transforms surface them honestly.
+    """
     return [
         SeriesPoint(
             period=row.period,
             value=float(row.value) if row.value is not None else None,
             missing_reason=row.missing_reason,
         )
-        for row in sorted(latest.values(), key=lambda r: r.period)
+        for row in latest_vintage_records(session, indicator_id, country_iso3)
     ]
 
 
@@ -125,6 +137,7 @@ def persist_derived(
 
 __all__ = [
     "DeriveError",
+    "latest_vintage_records",
     "latest_vintage_series",
     "observation_id_map",
     "persist_derived",

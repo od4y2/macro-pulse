@@ -20,7 +20,10 @@ calendar built in S07.
 
 Each entry carries: unit, frequency, seasonal-adjustment status, primary and
 fallback source references (system, code, verification status, coverage),
-comparability notes, and limitations.
+comparability notes, limitations, and a direction (S09 presentation
+convention: `higher_is_better` / `lower_is_better` / `neutral` - how a
+higher value reads on the dashboard; `policy_rate` is neutral because
+direction adjustment would assert a judgment).
 
 ## Source systems and fallback policy
 
