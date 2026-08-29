@@ -1,0 +1,18 @@
+# S12 acceptance run - 2026-08-29 09:07 UTC
+## Full suite
+..........................................................               [100%]
+346 passed in 7.03s
+
+## ruff check (unit-intended files)
+All checks passed!
+
+## ruff format --check (unit-intended files)
+6 files already formatted
+
+## smoke (lens + case study + catalog validation)
+catalog OK: 12 indicators
+episodes OK: 4 verified (all external, cited)
+records OK: 8 ; unrecorded provinces named: 29
+
+## python -m macropulse.smoke (PYTHONPATH=src; bare invocation hits the tracked E01 .venv defect)
+MacroPulse starter smoke test passed

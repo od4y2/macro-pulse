@@ -1,0 +1,39 @@
+== payment profiles (real, live WB API, retrieved 2026-08-29) ==
+iso3  role       period   digital_payments  health_expenditure  missing
+CHN   case       2021     86.1900701715971          5.25590324  -
+KOR   reference  2021     97.9389372051234          8.34412766  -
+USA   reference  2021     92.9663801012284         17.35207748  -
+CHN   (wave)    2024     88.7201133472321                None  (('health_expenditure', 'not_observed_at_period'),)
+
+== verified episode registry (external, citation-backed) ==
+yn-mi-2024-rollover        2024-12-31 20:00 -> 01-02 20:00   48h scheduled_maintenance
+                           source: Kunming Municipal Medical Security Bureau - 昆明市医疗保障局关于2024年医保信息平台计息和业务结转工作停机的通告
+yn-mi-2025-rollover        2025-12-31 20:00 -> 01-02 20:00   48h scheduled_maintenance
+                           source: Yunnan Provincial Medical Security Bureau - 关于2025年云南省医保信息平台计息和业务结转工作停机的公告
+yn-mi-2026-03-maintenance  2026-03-24 22:00 -> 03-25 06:00    8h scheduled_maintenance
+                           source: Yunnan Provincial Medical Security Bureau - 云南省医疗保障信息平台升级维护公告
+yn-mi-2026-06-maintenance  2026-06-12 23:00 -> 06-13 01:00    2h scheduled_maintenance
+                           source: Yunnan Provincial Medical Security Bureau - 云南省医疗保障信息平台升级维护公告
+
+== observation alignment (the computed blind spot) ==
+yn-mi-2024-rollover        monthly    spanned=('2024-12', '2025-01')           straddles=True  share=0.06452 resolvable=False
+yn-mi-2024-rollover        quarterly  spanned=('2024-Q4', '2025-Q1')           straddles=True  share=0.02174 resolvable=False
+yn-mi-2024-rollover        annual     spanned=('2024', '2025')                 straddles=True  share=0.00546 resolvable=False
+yn-mi-2025-rollover        monthly    spanned=('2025-12', '2026-01')           straddles=True  share=0.06452 resolvable=False
+yn-mi-2025-rollover        quarterly  spanned=('2025-Q4', '2026-Q1')           straddles=True  share=0.02174 resolvable=False
+yn-mi-2025-rollover        annual     spanned=('2025', '2026')                 straddles=True  share=0.00548 resolvable=False
+yn-mi-2026-03-maintenance  monthly    spanned=('2026-03',)                     straddles=False share=0.01075 resolvable=True
+yn-mi-2026-03-maintenance  quarterly  spanned=('2026-Q1',)                     straddles=False share=0.00370 resolvable=False
+yn-mi-2026-03-maintenance  annual     spanned=('2026',)                        straddles=False share=0.00091 resolvable=False
+yn-mi-2026-06-maintenance  monthly    spanned=('2026-06',)                     straddles=False share=0.00278 resolvable=False
+yn-mi-2026-06-maintenance  quarterly  spanned=('2026-Q2',)                     straddles=False share=0.00092 resolvable=False
+yn-mi-2026-06-maintenance  annual     spanned=('2026',)                        straddles=False share=0.00023 resolvable=False
+
+== resource exposure of the Yunnan episodes (verified records) ==
+yn-mi-2024-rollover        region=Yunnan institutions=28765 beds=359900 (record year 2023, predates the episode)
+yn-mi-2025-rollover        region=Yunnan institutions=28765 beds=359900 (record year 2023, predates the episode)
+yn-mi-2026-03-maintenance  region=Yunnan institutions=28765 beds=359900 (record year 2023, predates the episode)
+yn-mi-2026-06-maintenance  region=Yunnan institutions=28765 beds=359900 (record year 2023, predates the episode)
+
+unrecorded provinces (named, never imputed): 29
+episode windows are CST (China Standard Time, UTC+8, no DST)
