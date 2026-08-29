@@ -121,6 +121,12 @@ FORMULAS: dict[str, str] = {
         "positive = favorable; window occupancy >= 3 non-missing members. "
         "Zero MAD is missing (zero_scale), never fabricated."
     ),
+    "youth_headline_gap": (
+        "Youth unemployment minus headline unemployment, in percentage "
+        "points (RQ1 divergence measure, S10 labor lens). Positive = youth "
+        "fare worse than the headline. Only computed when both inputs "
+        "exist; never imputed."
+    ),
 }
 
 
