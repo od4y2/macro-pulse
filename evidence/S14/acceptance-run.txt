@@ -1,0 +1,37 @@
+# S14 acceptance run - 2026-09-01 15:11:44
+# checkpoint before unit: 2ea760e (S13), working tree clean at start
+
+## Full test suite
+........................................................................ [ 18%]
+........................................................................ [ 36%]
+........................................................................ [ 54%]
+........................................................................ [ 73%]
+........................................................................ [ 91%]
+..................................                                       [100%]
+=============================== warnings summary ===============================
+.venv/lib/python3.13/site-packages/fastapi/testclient.py:1
+
+394 passed, 1 warning in 7.46s
+
+## Unit-scoped tests only
+26 passed in 0.05s
+
+## Smoke (S13 query service still healthy)
+  from starlette.testclient import TestClient as TestClient  # noqa
+MacroPulse query service smoke test passed: {'status': 'ok', 'data_mode': 'database'}
+
+## Ruff (unit-intended files)
+All checks passed!
+5 files already formatted
+
+## New runtime dependencies importable
+streamlit 1.62.0, plotly 7.0.0
+
+## Streamlit server boots headless
+streamlit health: ok
+dashboard page -> HTTP 200
+
+## Live demo (AppTest over the running service, real WB data): evidence/S14/live-demo-output.txt
+demo steps: 7
+app exceptions: exceptions: 0
+comparison matrix: matrix shape: (11, 11)
