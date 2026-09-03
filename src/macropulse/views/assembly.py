@@ -121,7 +121,10 @@ def chart_traces(observations: list[dict], country_order: list[str]) -> list[dic
 
     Values stay raw (no rounding); missing periods carry ``None`` so the
     dashboard renders them as gaps - an interpolated line through a
-    missing period would fabricate data.
+    missing period would fabricate data. Each trace also carries
+    ``hover`` - one provenance record per point (vintage, evidence
+    label, quality grade, missing reason) - so chart tooltips show the
+    same provenance the tables do (S15).
     """
     by_country: dict[str, list[dict]] = {c: [] for c in country_order}
     for o in observations:
@@ -137,6 +140,15 @@ def chart_traces(observations: list[dict], country_order: list[str]) -> list[dic
                 "xs": [o["period"] for o in obs],
                 "ys": [o["value"] for o in obs],  # raw values, None for missing
                 "unit": obs[0]["unit"],
+                "hover": [
+                    {
+                        "vintage": o["vintage"],
+                        "evidence_label": o["evidence_label"],
+                        "quality_grade": o["quality_grade"],
+                        "missing_reason": o["missing_reason"],
+                    }
+                    for o in obs
+                ],
             }
         )
     return traces
