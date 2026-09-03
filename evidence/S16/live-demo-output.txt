@@ -1,0 +1,60 @@
+
+=== fetch validated facts from the running query service ===
+service health: {'status': 'ok', 'data_mode': 'database'}
+observations served: 110; indicators: ['gdp_real_growth']
+facts: 110 real observations, 0 missing, 0 excluded
+
+=== build claims and adjudicate against the validated JSON ===
+claims built: {'level': 10, 'change': 10}
+validated: 20/20
+
+=== rejection demonstrations (deliberately bad input, clearly labelled) ===
+tampered value claim -> validated=False, reason=value_mismatch
+causal sentence -> banned: ['causal_phrase']
+
+=== render the document and run the banned-phrase check on it ===
+MacroPulse structured briefing
+=============================
+
+Scope: 10 economies, 1 indicator(s), 110 validated observations (evidence: real). 0 observation(s) excluded - not real evidence, never stated as observed; 0 recorded missing.
+
+Statements
+----------
+- Real GDP growth (annual %) [gdp_real_growth] for BRA in 2025-01-01: 2.2857464902475 percent_per_year (source: world_bank NY.GDP.MKTP.KD.ZG; vintage: 2026-09-01; evidence: real; quality: ungraded)
+- Real GDP growth (annual %) [gdp_real_growth] for BRA: 2.2857464902475 percent_per_year in 2025-01-01, down from 3.41931516501906 in 2024-01-01 (source: world_bank NY.GDP.MKTP.KD.ZG; vintage: 2026-09-01; evidence: real; quality: ungraded)
+- Real GDP growth (annual %) [gdp_real_growth] for CHN in 2025-01-01: 4.95994886240992 percent_per_year (source: world_bank NY.GDP.MKTP.KD.ZG; vintage: 2026-09-01; evidence: real; quality: ungraded)
+- Real GDP growth (annual %) [gdp_real_growth] for CHN: 4.95994886240992 percent_per_year in 2025-01-01, up from 4.95830378788091 in 2024-01-01 (source: world_bank NY.GDP.MKTP.KD.ZG; vintage: 2026-09-01; evidence: real; quality: ungraded)
+- Real GDP growth (annual %) [gdp_real_growth] for DEU in 2025-01-01: 0.239578342117881 percent_per_year (source: world_bank NY.GDP.MKTP.KD.ZG; vintage: 2026-09-01; evidence: real; quality: ungraded)
+- Real GDP growth (annual %) [gdp_real_growth] for DEU: 0.239578342117881 percent_per_year in 2025-01-01, up from -0.495851897260366 in 2024-01-01 (source: world_bank NY.GDP.MKTP.KD.ZG; vintage: 2026-09-01; evidence: real; quality: ungraded)
+- Real GDP growth (annual %) [gdp_real_growth] for GBR in 2025-01-01: 1.38844207858726 percent_per_year (source: world_bank NY.GDP.MKTP.KD.ZG; vintage: 2026-09-01; evidence: real; quality: ungraded)
+- Real GDP growth (annual %) [gdp_real_growth] for GBR: 1.38844207858726 percent_per_year in 2025-01-01, up from 1.08027716858781 in 2024-01-01 (source: world_bank NY.GDP.MKTP.KD.ZG; vintage: 2026-09-01; evidence: real; quality: ungraded)
+- Real GDP growth (annual %) [gdp_real_growth] for IND in 2025-01-01: 7.56666179284244 percent_per_year (source: world_bank NY.GDP.MKTP.KD.ZG; vintage: 2026-09-01; evidence: real; quality: ungraded)
+- Real GDP growth (annual %) [gdp_real_growth] for IND: 7.56666179284244 percent_per_year in 2025-01-01, up from 7.09927893176518 in 2024-01-01 (source: world_bank NY.GDP.MKTP.KD.ZG; vintage: 2026-09-01; evidence: real; quality: ungraded)
+- Real GDP growth (annual %) [gdp_real_growth] for JPN in 2025-01-01: 1.19311288444599 percent_per_year (source: world_bank NY.GDP.MKTP.KD.ZG; vintage: 2026-09-01; evidence: real; quality: ungraded)
+- Real GDP growth (annual %) [gdp_real_growth] for JPN: 1.19311288444599 percent_per_year in 2025-01-01, up from -0.240084236041696 in 2024-01-01 (source: world_bank NY.GDP.MKTP.KD.ZG; vintage: 2026-09-01; evidence: real; quality: ungraded)
+- Real GDP growth (annual %) [gdp_real_growth] for KOR in 2025-01-01: 1.00701840291242 percent_per_year (source: world_bank NY.GDP.MKTP.KD.ZG; vintage: 2026-09-01; evidence: real; quality: ungraded)
+- Real GDP growth (annual %) [gdp_real_growth] for KOR: 1.00701840291242 percent_per_year in 2025-01-01, down from 2.00361101838986 in 2024-01-01 (source: world_bank NY.GDP.MKTP.KD.ZG; vintage: 2026-09-01; evidence: real; quality: ungraded)
+- Real GDP growth (annual %) [gdp_real_growth] for MEX in 2025-01-01: 0.561683456144578 percent_per_year (source: world_bank NY.GDP.MKTP.KD.ZG; vintage: 2026-09-01; evidence: real; quality: ungraded)
+- Real GDP growth (annual %) [gdp_real_growth] for MEX: 0.561683456144578 percent_per_year in 2025-01-01, down from 1.35057631384696 in 2024-01-01 (source: world_bank NY.GDP.MKTP.KD.ZG; vintage: 2026-09-01; evidence: real; quality: ungraded)
+- Real GDP growth (annual %) [gdp_real_growth] for USA in 2025-01-01: 2.16138195623856 percent_per_year (source: world_bank NY.GDP.MKTP.KD.ZG; vintage: 2026-09-01; evidence: real; quality: ungraded)
+- Real GDP growth (annual %) [gdp_real_growth] for USA: 2.16138195623856 percent_per_year in 2025-01-01, down from 2.79318715363841 in 2024-01-01 (source: world_bank NY.GDP.MKTP.KD.ZG; vintage: 2026-09-01; evidence: real; quality: ungraded)
+- Real GDP growth (annual %) [gdp_real_growth] for ZAF in 2025-01-01: 1.11462608103956 percent_per_year (source: world_bank NY.GDP.MKTP.KD.ZG; vintage: 2026-09-01; evidence: real; quality: ungraded)
+- Real GDP growth (annual %) [gdp_real_growth] for ZAF: 1.11462608103956 percent_per_year in 2025-01-01, up from 0.534843531905139 in 2024-01-01 (source: world_bank NY.GDP.MKTP.KD.ZG; vintage: 2026-09-01; evidence: real; quality: ungraded)
+
+Availability
+------------
+- No missing observations in the served set.
+
+Limitations
+-----------
+- This briefing states observed values with citations only; it makes no causal statements, no rankings of merit, no forward-looking statements, and no financial guidance (see macropulse.scope.NON_CLAIMS).
+
+banned phrases in rendered document: []
+Rejection report: no claims rejected.
+
+=== persist the run (incl. the rejected tampered claim) and re-read ===
+run 2: model='deterministic-template', prompt_version='s16-v1', status='completed'
+claims stored: 21 (20 validated, 1 rejected)
+a rejected row's evidence_refs: [{'indicator_id': 'gdp_real_growth', 'country_iso3': 'BRA', 'period': '2025-01-01', 'vintage': '2026-09-01', 'source_system': 'world_bank', 'source_code': 'NY.GDP.MKTP.KD.ZG'}]
+
+=== demo complete - prose derived only from validated JSON, with citations ===
