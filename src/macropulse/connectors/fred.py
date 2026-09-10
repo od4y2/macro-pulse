@@ -179,7 +179,11 @@ class FredConnector:
                 params["realtime_start"] = realtime_start.isoformat()
             if realtime_end is not None:
                 params["realtime_end"] = realtime_end.isoformat()
-            with httpx.Client(transport=self._transport) as client:
+            # 60s like the WB connector: the httpx default 5s connect
+            # timeout fails TLS handshakes on slow routes (found during the
+            # first scheduled refresh, 2026-09-10 - recorded as fetch_failed
+            # in refresh_runs runs 1-3 before this fix).
+            with httpx.Client(transport=self._transport, timeout=60.0) as client:
                 response = client.get(self._base_url, params=params)
             if response.status_code != 200:
                 raise http_error(response.status_code, "FRED", series_id)
