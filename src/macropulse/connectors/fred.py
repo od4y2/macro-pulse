@@ -34,6 +34,7 @@ from macropulse.connectors.base import (
     ConnectorError,
     FetchedPoint,
     FetchedSeries,
+    http_error,
 )
 
 FRED_BASE_URL = "https://api.stlouisfed.org/fred/series/observations"
@@ -72,14 +73,14 @@ def parse_fred_observations(payload: str, series_id: str) -> list[FetchedPoint]:
             vintage = date.fromisoformat(str(obs["realtime_start"]))
             raw_value = str(obs["value"])
         except (KeyError, ValueError) as exc:
-            raise ConnectorError(
-                f"{series_id}: malformed observation {obs!r}"
-            ) from exc
+            raise ConnectorError(f"{series_id}: malformed observation {obs!r}") from exc
         if raw_value == FRED_MISSING_VALUE:
             points.append(
                 FetchedPoint(
-                    period=period, value=None,
-                    missing_reason="fred_missing_value", vintage=vintage,
+                    period=period,
+                    value=None,
+                    missing_reason="fred_missing_value",
+                    vintage=vintage,
                 )
             )
         else:
@@ -90,7 +91,9 @@ def parse_fred_observations(payload: str, series_id: str) -> list[FetchedPoint]:
                     f"{series_id}: non-numeric value {raw_value!r}"
                 ) from exc
             points.append(
-                FetchedPoint(period=period, value=value, missing_reason=None, vintage=vintage)
+                FetchedPoint(
+                    period=period, value=value, missing_reason=None, vintage=vintage
+                )
             )
     return points
 
@@ -118,11 +121,17 @@ class FredConnector:
     httpx.MockTransport for live-mode tests without network access.
     """
 
-    def __init__(self, api_key: str | None = None, base_url: str = FRED_BASE_URL,
-                 transport: httpx.BaseTransport | None = None) -> None:
+    def __init__(
+        self,
+        api_key: str | None = None,
+        base_url: str = FRED_BASE_URL,
+        transport: httpx.BaseTransport | None = None,
+    ) -> None:
         import os
 
-        self._api_key = api_key if api_key is not None else os.environ.get("FRED_API_KEY")
+        self._api_key = (
+            api_key if api_key is not None else os.environ.get("FRED_API_KEY")
+        )
         self._base_url = base_url
         self._transport = transport
 
@@ -173,9 +182,7 @@ class FredConnector:
             with httpx.Client(transport=self._transport) as client:
                 response = client.get(self._base_url, params=params)
             if response.status_code != 200:
-                raise ConnectorError(
-                    f"{series_id}: HTTP {response.status_code} from FRED"
-                )
+                raise http_error(response.status_code, "FRED", series_id)
             payload = response.text
             label = "real"
         else:

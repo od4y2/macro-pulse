@@ -25,6 +25,7 @@ from macropulse.connectors.base import (
     ConnectorError,
     FetchedPoint,
     FetchedSeries,
+    http_error,
 )
 
 WORLDBANK_BASE_URL = "https://api.worldbank.org/v2"
@@ -62,18 +63,28 @@ def parse_worldbank_observations(payload: str, code: str) -> list[FetchedPoint]:
             year = int(str(row["date"]))
             period = date(year, 1, 1)
         except (KeyError, ValueError) as exc:
-            raise ConnectorError(f"{code}: malformed period {row.get('date')!r}") from exc
+            raise ConnectorError(
+                f"{code}: malformed period {row.get('date')!r}"
+            ) from exc
         value = row.get("value")
         if value is None:
             points.append(
-                FetchedPoint(period=period, value=None,
-                             missing_reason=WB_MISSING_REASON, vintage=period)
+                FetchedPoint(
+                    period=period,
+                    value=None,
+                    missing_reason=WB_MISSING_REASON,
+                    vintage=period,
+                )
             )
         else:
             try:
                 points.append(
-                    FetchedPoint(period=period, value=float(value),
-                                 missing_reason=None, vintage=period)
+                    FetchedPoint(
+                        period=period,
+                        value=float(value),
+                        missing_reason=None,
+                        vintage=period,
+                    )
                 )
             except (TypeError, ValueError) as exc:
                 raise ConnectorError(f"{code}: non-numeric value {value!r}") from exc
@@ -87,8 +98,11 @@ class WorldBankConnector:
     supports offline fixtures.
     """
 
-    def __init__(self, base_url: str = WORLDBANK_BASE_URL,
-                 transport: httpx.BaseTransport | None = None) -> None:
+    def __init__(
+        self,
+        base_url: str = WORLDBANK_BASE_URL,
+        transport: httpx.BaseTransport | None = None,
+    ) -> None:
         self._base_url = base_url.rstrip("/")
         self._transport = transport
 
@@ -101,7 +115,11 @@ class WorldBankConnector:
     ) -> FetchedSeries:
         if not code or not code.strip():
             raise ConnectorError("indicator code must be non-empty")
-        if len(country_iso3) != 3 or not country_iso3.isalpha() or not country_iso3.isupper():
+        if (
+            len(country_iso3) != 3
+            or not country_iso3.isalpha()
+            or not country_iso3.isupper()
+        ):
             raise ConnectorError(f"invalid ISO3 country code: {country_iso3!r}")
 
         retrieval_time = datetime.now(UTC)
@@ -115,9 +133,7 @@ class WorldBankConnector:
         with httpx.Client(transport=self._transport, timeout=60.0) as client:
             response = client.get(url, params=params)
         if response.status_code != 200:
-            raise ConnectorError(
-                f"{code}: HTTP {response.status_code} from World Bank"
-            )
+            raise http_error(response.status_code, "World Bank", code)
         payload = response.text
 
         points = parse_worldbank_observations(payload, code)

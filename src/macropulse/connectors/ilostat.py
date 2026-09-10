@@ -28,6 +28,7 @@ from macropulse.connectors.base import (
     ConnectorError,
     FetchedPoint,
     FetchedSeries,
+    http_error,
 )
 
 ILOSTAT_BASE_URL = "https://sdmx.ilo.org/rest"
@@ -71,8 +72,12 @@ def parse_ilostat_csv(
         raw_value = (row.get("OBS_VALUE") or "").strip()
         if raw_value == "":
             points.append(
-                FetchedPoint(period=period, value=None,
-                             missing_reason=ILO_MISSING_REASON, vintage=period)
+                FetchedPoint(
+                    period=period,
+                    value=None,
+                    missing_reason=ILO_MISSING_REASON,
+                    vintage=period,
+                )
             )
         else:
             try:
@@ -82,8 +87,9 @@ def parse_ilostat_csv(
                     f"{dataflow}: non-numeric OBS_VALUE {raw_value!r}"
                 ) from exc
             points.append(
-                FetchedPoint(period=period, value=value,
-                             missing_reason=None, vintage=period)
+                FetchedPoint(
+                    period=period, value=value, missing_reason=None, vintage=period
+                )
             )
 
     if not points:
@@ -101,8 +107,11 @@ class IlostatConnector:
     supports offline fixtures.
     """
 
-    def __init__(self, base_url: str = ILOSTAT_BASE_URL,
-                 transport: httpx.BaseTransport | None = None) -> None:
+    def __init__(
+        self,
+        base_url: str = ILOSTAT_BASE_URL,
+        transport: httpx.BaseTransport | None = None,
+    ) -> None:
         self._base_url = base_url.rstrip("/")
         self._transport = transport
 
@@ -116,7 +125,11 @@ class IlostatConnector:
     ) -> FetchedSeries:
         if not dataflow or not dataflow.strip():
             raise ConnectorError("dataflow must be non-empty")
-        if len(country_iso3) != 3 or not country_iso3.isalpha() or not country_iso3.isupper():
+        if (
+            len(country_iso3) != 3
+            or not country_iso3.isalpha()
+            or not country_iso3.isupper()
+        ):
             raise ConnectorError(f"invalid ISO3 country code: {country_iso3!r}")
 
         retrieval_time = datetime.now(UTC)
@@ -132,9 +145,7 @@ class IlostatConnector:
         with httpx.Client(transport=self._transport, timeout=180.0) as client:
             response = client.get(url, params=params)
         if response.status_code != 200:
-            raise ConnectorError(
-                f"{dataflow}: HTTP {response.status_code} from ILOSTAT"
-            )
+            raise http_error(response.status_code, "ILOSTAT", dataflow)
         payload = response.text
 
         points = parse_ilostat_csv(payload, dataflow, country_iso3, sex)

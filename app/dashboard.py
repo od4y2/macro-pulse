@@ -136,7 +136,8 @@ EVIDENCE_LABEL_MEANINGS = {
     "real": "live-retrieved from the provider API",
     "mocked": "deterministic no-key fixture (connector fixture mode)",
     "synthetic": "test fixture - never presented as observed",
-    "cached": "reserved for the scheduled-refresh layer (not yet emitted)",
+    "cached": "reserved: the S17 refresh layer stores real data or "
+    "records failure; no cached rows are emitted",
     "external": "document-verified registry entry (case study; a document, "
     "never an API observation)",
 }

@@ -107,14 +107,19 @@ class ReleaseCalendarEntry(Base):
         ForeignKey("indicators.indicator_id"), nullable=False
     )
     reference_period: Mapped[date] = mapped_column(Date, nullable=False)
-    scheduled_release: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    scheduled_release: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
     actual_release: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
     notes: Mapped[str] = mapped_column(Text, nullable=False, default="")
     __table_args__ = (
         UniqueConstraint(
-            "source_system", "country_iso3", "indicator_id", "reference_period",
+            "source_system",
+            "country_iso3",
+            "indicator_id",
+            "reference_period",
             name="uq_release_unique",
         ),
     )
@@ -136,7 +141,9 @@ class RawObservation(Base):
         ForeignKey("indicators.indicator_id"), nullable=False
     )
     period: Mapped[date] = mapped_column(Date, nullable=False)
-    value: Mapped[float | None] = mapped_column(Numeric, nullable=True)  # NULL = missing
+    value: Mapped[float | None] = mapped_column(
+        Numeric, nullable=True
+    )  # NULL = missing
     retrieved_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
@@ -159,7 +166,9 @@ class NormalizedObservation(Base):
         ForeignKey("countries.iso3"), nullable=False
     )
     period: Mapped[date] = mapped_column(Date, nullable=False)
-    value: Mapped[float | None] = mapped_column(Numeric, nullable=True)  # NULL = missing, never imputed silently
+    value: Mapped[float | None] = mapped_column(
+        Numeric, nullable=True
+    )  # NULL = missing, never imputed silently
     unit: Mapped[str] = mapped_column(String(64), nullable=False)
     frequency: Mapped[str] = mapped_column(
         Enum(*FREQUENCIES, name="frequency"), nullable=False
@@ -170,15 +179,25 @@ class NormalizedObservation(Base):
     source_id: Mapped[int] = mapped_column(
         ForeignKey("source_catalog.id"), nullable=False
     )
-    release_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    retrieval_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    release_time: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    retrieval_time: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
     vintage: Mapped[date] = mapped_column(Date, nullable=False)
     evidence_label: Mapped[str] = mapped_column(EVIDENCE_LABEL_ENUM, nullable=False)
-    quality_grade: Mapped[str] = mapped_column(String(32), nullable=False, default="ungraded")
+    quality_grade: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="ungraded"
+    )
     missing_reason: Mapped[str | None] = mapped_column(String(200), nullable=True)
     __table_args__ = (
         UniqueConstraint(
-            "indicator_id", "country_iso3", "period", "vintage", "source_id",
+            "indicator_id",
+            "country_iso3",
+            "period",
+            "vintage",
+            "source_id",
             name="uq_observation_identity",
         ),
         CheckConstraint(
@@ -204,10 +223,14 @@ class DerivedMetric(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
     __table_args__ = (
-        UniqueConstraint("metric_key", "country_iso3", "period", name="uq_metric_identity"),
+        UniqueConstraint(
+            "metric_key", "country_iso3", "period", name="uq_metric_identity"
+        ),
     )
 
-    versions = relationship("MetricVersion", back_populates="metric", cascade="all, delete-orphan")
+    versions = relationship(
+        "MetricVersion", back_populates="metric", cascade="all, delete-orphan"
+    )
 
 
 class MetricVersion(Base):
@@ -254,7 +277,9 @@ class BriefingRun(Base):
     prompt_version: Mapped[str] = mapped_column(String(32), nullable=False)
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")
 
-    claims = relationship("BriefingClaim", back_populates="run", cascade="all, delete-orphan")
+    claims = relationship(
+        "BriefingClaim", back_populates="run", cascade="all, delete-orphan"
+    )
 
 
 class BriefingClaim(Base):
@@ -265,7 +290,38 @@ class BriefingClaim(Base):
         ForeignKey("briefing_runs.id"), nullable=False
     )
     claim_text: Mapped[str] = mapped_column(Text, nullable=False)
-    evidence_refs: Mapped[list] = mapped_column(JSON, nullable=False)  # observation/metric ids
+    evidence_refs: Mapped[list] = mapped_column(
+        JSON, nullable=False
+    )  # observation/metric ids
     validated: Mapped[bool] = mapped_column(nullable=False, default=False)
 
     run = relationship("BriefingRun", back_populates="claims")
+
+
+class RefreshRun(Base):
+    """One scheduled-refresh execution (S17).
+
+    The durable operational audit: what ran, when, what it wrote, and what
+    failed - including partial runs. ``outcomes`` holds one record per
+    series (indicator x country) with counts and, for failures, the closed
+    reason vocabulary from ``macropulse.ops.runs``. Append-only semantics:
+    a row is inserted as ``running`` and updated in place until
+    finished; a ``running`` row at run time means the process died and is
+    marked ``interrupted`` by the next run.
+    """
+
+    __tablename__ = "refresh_runs"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    finished_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    trigger: Mapped[str] = mapped_column(String(16), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="running")
+    series_total: Mapped[int] = mapped_column(nullable=False, default=0)
+    series_failed: Mapped[int] = mapped_column(nullable=False, default=0)
+    outcomes: Mapped[list] = mapped_column(JSON, nullable=False)  # per-series records
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)

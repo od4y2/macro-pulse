@@ -61,8 +61,10 @@ it":
   with each grade's S07 meaning (including why `preliminary` and
   `estimated` are reserved), the freshness convention and its threshold,
   and the five evidence labels with their true origins — `cached` is
-  honestly marked "reserved for the scheduled-refresh layer (not yet
-  emitted)".
+  honestly marked "reserved: the S17 refresh layer stores real data or
+  records failure; no cached rows are emitted" (the layer exists as of
+  S17 and still emits nothing labelled `cached`; verified again when the
+  legend was reworded).
 - **Freshness** is computed, not stored: a sidebar **as-of date**
   (default today UTC) is the only clock read; every state derives from
   it arithmetically — age from the last *observed* period to the

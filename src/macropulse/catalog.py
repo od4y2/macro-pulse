@@ -42,6 +42,12 @@ class SourceRef(NamedTuple):
     code: str  # series/indicator identifier in that system
     verified: str  # one of VERIFICATION_STATUSES
     coverage: str  # which economies/periods this source covers
+    # Machine-readable coverage (S17): the panel economies whose data this
+    # code actually measures, or None = every panel economy. The scheduled
+    # refresh layer plans (indicator, country) pairs from this field so a
+    # country-specific code (e.g. FEDFUNDS is US data) can never be fetched
+    # and stored under another economy. Must stay consistent with `coverage`.
+    countries: tuple[str, ...] | None = None
 
 
 class Indicator(NamedTuple):
@@ -82,6 +88,7 @@ CATALOG: tuple[Indicator, ...] = (
             code="CLVMNACSCAB1GQDE",
             verified="confirmed",
             coverage="Germany only (Eurostat via FRED, quarterly SA); other economies lack usable FRED GDP mirrors (verified live 2026-08-19)",
+            countries=("DEU",),
         ),
         fallback_status="primary-and-fallback",
         comparability_notes=(
@@ -112,6 +119,7 @@ CATALOG: tuple[Indicator, ...] = (
             code="CPIAUCSL",
             verified="confirmed",
             coverage="United States only; monthly, seasonally adjusted index (YoY derived)",
+            countries=("USA",),
         ),
         fallback_status="primary-and-fallback",
         comparability_notes=(
@@ -139,6 +147,7 @@ CATALOG: tuple[Indicator, ...] = (
             code="UNRATE",
             verified="confirmed",
             coverage="United States only; monthly, seasonally adjusted (BLS household survey)",
+            countries=("USA",),
         ),
         fallback_status="primary-and-fallback",
         comparability_notes=(
@@ -343,6 +352,7 @@ CATALOG: tuple[Indicator, ...] = (
             code="FEDFUNDS",
             verified="confirmed",
             coverage="United States; other panel economies need FRED mirrors or central-bank sources (S04/S05 audit)",
+            countries=("USA",),
         ),
         fallback_source=None,
         fallback_status="primary-only",
@@ -407,6 +417,25 @@ def validate_catalog() -> list[str]:
                     f"{ind.indicator_id}: source code {ref.code!r} contains whitespace "
                     "(notes belong in coverage)"
                 )
+            if ref.countries is not None:
+                if len(ref.countries) == 0:
+                    problems.append(
+                        f"{ind.indicator_id}: source {ref.code!r} countries is empty "
+                        "(use None for every panel economy)"
+                    )
+                if len(set(ref.countries)) != len(ref.countries):
+                    problems.append(
+                        f"{ind.indicator_id}: source {ref.code!r} has duplicate countries"
+                    )
+                from macropulse.scope import COUNTRIES  # local import: avoid cycles
+
+                panel = {c.iso3 for c in COUNTRIES}
+                outside = [c for c in ref.countries if c not in panel]
+                if outside:
+                    problems.append(
+                        f"{ind.indicator_id}: source {ref.code!r} countries "
+                        f"{outside} are outside the locked panel"
+                    )
 
         if (
             ind.fallback_status == "primary-and-fallback"

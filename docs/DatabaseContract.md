@@ -2,7 +2,8 @@
 
 Machine-readable sources of truth: `src/macropulse/db/models.py` (schema) and
 `src/macropulse/api/schemas.py` (API contract). Alembic migration
-`bcc78be651f0` implements the schema on PostgreSQL 16 (docker-compose).
+`bcc78be651f0` implements the schema on PostgreSQL 16 (docker-compose);
+`c9af6b543047` adds the S17 `refresh_runs` table (see the dated note below).
 The S13 FastAPI service must implement the API contract below without
 changing response shapes; changes require a new decision entry.
 
@@ -27,9 +28,12 @@ FastAPI query service (S13) --reads only--> Streamlit (S14) / AI briefing (S16)
 Module boundaries: connectors write raw only; the pipeline writes normalized
 only; the metric engine reads normalized and writes derived + versions; the
 API layer is read-only; AI briefings (S16) read validated facts and record
-claims with evidence refs.
+claims with evidence refs. The S17 refresh layer ORCHESTRATES connectors and
+the S06 pipeline (writing raw + normalized through them) and additionally
+writes its own `refresh_runs` audit rows — it adds no new observation tables
+or paths.
 
-## Tables (11)
+## Tables (12)
 
 | Table | Purpose | Key constraints |
 |---|---|---|
@@ -44,6 +48,12 @@ claims with evidence refs.
 | data_quality_flags | explicit quality/missingness flags | FK normalized_observation |
 | briefing_runs | one row per AI briefing attempt | model + prompt_version recorded |
 | briefing_claims | atomic claims with evidence refs | FK briefing_run; validated flag |
+| refresh_runs | one row per scheduled-refresh cycle (S17) | append-only lifecycle; outcomes JSON with closed reason vocabulary |
+
+Dated note (S17, 2026-09-10): the twelfth table `refresh_runs` was added by
+migration `c9af6b543047` — the operational audit layer. It breaks no S03
+lock: observation identity, provenance fields, and evidence governance are
+untouched (verified by the unchanged S03 model tests plus the S13 pin).
 
 Governance enforced at the schema level:
 
