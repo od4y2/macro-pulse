@@ -1,11 +1,14 @@
-# Dashboard (S14–S15)
+# Dashboard (S14–S18)
 
 The Streamlit dashboard serves three views over the S13 query service:
 country, comparison, and provenance. All data shaping lives in tested,
 pure functions (`src/macropulse/views/assembly.py`); presentation labels
-(freshness, badges, captions) in `src/macropulse/views/labels.py`; all
-fetching lives in the typed client (`src/macropulse/views/client.py`);
-the Streamlit script itself is a thin rendering layer.
+(freshness, badges, captions) in `src/macropulse/views/labels.py`; the
+S18 visual language (design tokens, focus-and-context, episode overlays)
+in `src/macropulse/views/theme.py` and
+`src/macropulse/views/annotations.py`; all fetching lives in the typed
+client (`src/macropulse/views/client.py`); the Streamlit script itself is
+a thin rendering layer.
 
 ## Run
 
@@ -38,7 +41,9 @@ different units never share a chart axis, because a shared axis would
 mislead; the table is shown instead.
 
 ### Comparison view
-One indicator across selected countries: a line chart, a
+One indicator across selected countries: a focus-and-context line chart
+(one **focus country** wears its entity hue; every other economy renders
+in context grey — at most one colored line at a time), a
 periods × countries matrix, and per-country coverage counts (observed /
 missing / total periods, first and last observed). The matrix names
 missing cells — never blank, zero, or interpolated; the chart leaves
@@ -98,6 +103,44 @@ it":
   indicator absent from the catalog renders an explicit
   "no catalog entry" line.
 
+## Visual language (S18)
+
+An editorial look-and-feel, referenced from the Financial Times's modern
+presentation (adopted: serif headline type, hairline grid, recessive
+non-data ink, generous whitespace, direct labels; NOT adopted: the
+newsroom palette and dark mode). Light mode is **pinned** in
+`.streamlit/config.toml` — the palette is validated against the light
+surface and an automatic dark flip would invalidate it. One mode,
+rendered right.
+
+- **Design tokens** (`src/macropulse/views/theme.py`, pure and tested):
+  an entity-fixed ten-hue palette covering exactly the S01 panel. Color
+  follows the **entity, never its rank** — switching the focus country
+  repaints nothing; the new focus keeps its own hue and the old focus
+  falls back to context grey. An unknown country raises rather than
+  defaulting to a hue (identity is never fabricated). The palette is
+  validator-run (`evidence/S18/palette-validation.txt`); the floor-band
+  WARNs are legal only under the relief rule — every chart ships
+  secondary encoding (direct label + legend + the matrix table view)
+  and at most one colored line renders at a time.
+- **Focus-and-context**: the focus series wears its entity hue at focus
+  width and is the only legend entry; context series wear grey at a
+  lighter width with no legend entry. A direct label names the focus
+  series at its last *observed* point — a gap at the tail is never
+  labeled.
+- **Documented episode bands**
+  (`src/macropulse/case_study/macro_episodes.py` +
+  `src/macropulse/views/annotations.py`): validated registry entries —
+  citation is a constructor rule, the evidence label is always
+  `external` (an episode is a document about an event, never an API
+  observation), and the URL is live-verified. The 2020 WHO pandemic
+  window renders as a wash drawn *below* the lines, clipped to the
+  rendered range, with a callout anchored inside the band (a window
+  under 1% of the rendered range gets the wash but no callout). The
+  caption carries the full citation and states the band is *drawn as
+  observed*; a causal-wording filter runs at render time, so no
+  caption can claim the event caused the values.
+
 ## Failure and empty states
 
 - Service unreachable / degraded → an error with the exact command to
@@ -139,3 +182,18 @@ the error state.
   chart captions, limitations from the catalog, and the computed-label
   proof (moving the as-of date to 2028-01-01 flips every comparison
   state from `current` to `lagging`).
+- `tests/test_theme.py` (14), `tests/test_macro_episodes.py` (15),
+  `tests/test_annotations.py` (19): the token layer (panel-exact palette,
+  unknown-country rejection, focus/context styling, serif-left one-axis
+  layout, last-observed-point labels), the episode registry
+  (citation-mandatory construction, closed kinds, window arithmetic,
+  registry uniqueness), and the overlay builders (causal-wording
+  filter, range filtering, band/callout specs, narrow-band rule,
+  clipping, application to real figures, full-citation captions).
+- `evidence/S18/live-demo-output.txt` (DEMO PASSED, exit 0): the full
+  six-leg chain on a disposable database — live ingest through the
+  refresh CLI, gate + standardization, the service with a served-vs-
+  stored byte-check, the AppTest-driven dashboard asserting the S18
+  visual language on the served figure JSON (including the USA→CHN
+  focus switch), the S16 briefing, and the historical case (2020 panel
+  values beside the documented WHO window).

@@ -1,5 +1,7 @@
-"""MacroPulse dashboard (units S14-S15): country, comparison, provenance
-views with freshness labels, quality badges, and limitations.
+"""MacroPulse dashboard (units S14-S18): country, comparison, provenance
+views with freshness labels, quality badges, and limitations, rendered
+in the S18 editorial visual language (muted validated palette, serif
+display titles, focus-and-context charts, documented-episode bands).
 
 Thin Streamlit rendering over the S13 query service; all data shaping
 lives in tested, pure functions (``macropulse.views.assembly``), labels
@@ -22,12 +24,19 @@ Requires the query service to be running:
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 import plotly.graph_objects as go
 import streamlit as st
 
+from macropulse.case_study.macro_episodes import MACRO_EPISODES
 from macropulse.catalog import CATALOG
+from macropulse.views.annotations import (
+    apply_overlays,
+    episode_captions,
+    episode_overlays,
+    episodes_in_range,
+)
 from macropulse.views.assembly import (
     chart_traces,
     comparison_matrix,
@@ -45,8 +54,27 @@ from macropulse.views.labels import (
     merge_freshness,
     quality_badge,
 )
+from macropulse.views.theme import (
+    INK,
+    focus_label_point,
+    layout_update,
+    series_style,
+)
 
 st.set_page_config(page_title="MacroPulse", page_icon="🌍", layout="wide")
+
+# Editorial typography: open serif display face for headings (financial-
+# press faces are proprietary and are NOT used); degrades to Georgia
+# offline rather than substituting silently. Body/data text stays the
+# system sans (legibility at small sizes; config.toml pins light mode).
+st.markdown(
+    "<style>"
+    "@import url('https://fonts.googleapis.com/css2?family=Spectral:wght@500;600&display=swap');"
+    "h1, h2, h3 {font-family: Spectral, Georgia, serif !important;}"
+    ".stCaption {color: #52514e;}"
+    "</style>",
+    unsafe_allow_html=True,
+)
 
 st.title("MacroPulse")
 st.caption(
@@ -143,17 +171,38 @@ EVIDENCE_LABEL_MEANINGS = {
 }
 
 
-def line_chart(traces: list[dict], title: str, yaxis_title: str) -> go.Figure:
-    """One line per country; gaps for missing periods; provenance on hover."""
+def line_chart(
+    traces: list[dict],
+    title: str,
+    yaxis_title: str,
+    focus: str | None = None,
+) -> go.Figure:
+    """One line per country in the S18 editorial language.
+
+    Focus-and-context: the ``focus`` country (and every series when
+    there is exactly one) wears its entity color; all others wear
+    context grey, so a ten-economy comparison never puts ten hues on
+    screen. Gaps stay gaps (missing periods are never interpolated);
+    provenance travels on hover exactly as before (S15). Documented
+    episodes overlapping the rendered range draw as neutral bands with
+    a citation in the caller's caption (S18).
+    """
     fig = go.Figure()
+    first_period: str | None = None
+    last_period: str | None = None
     for t in traces:
+        is_focus = focus is None or t["country"] == focus
+        style = series_style(t["country"], is_focus)
         fig.add_trace(
             go.Scatter(
                 x=t["xs"],
                 y=t["ys"],
-                mode="lines+markers",
+                mode="lines",  # no markers on 60+ point series; hover
+                # carries point inspection without visual clutter
                 name=t["country"],
                 connectgaps=False,  # missing periods are gaps, not interpolated lines
+                line={"color": style["color"], "width": style["width"]},
+                showlegend=style["showlegend"] and len(traces) > 1,
                 customdata=[
                     [h["vintage"], h["evidence_label"], h["quality_grade"]]
                     for h in t["hover"]
@@ -167,7 +216,37 @@ def line_chart(traces: list[dict], title: str, yaxis_title: str) -> go.Figure:
                 ),
             )
         )
-    fig.update_layout(title=title, yaxis_title=yaxis_title)
+        if t["xs"]:
+            first_period = t["xs"][0] if first_period is None else min(first_period, t["xs"][0])
+            last_period = t["xs"][-1] if last_period is None else max(last_period, t["xs"][-1])
+
+    fig.update_layout(**layout_update(title, yaxis_title))
+
+    # Direct label on the focus line's last observed point: identity for
+    # the colored series without reading a legend (text wears ink, the
+    # colored line carries the hue).
+    if focus is not None and len(traces) > 1:
+        focus_trace = next((t for t in traces if t["country"] == focus), None)
+        if focus_trace is not None:
+            label_point = focus_label_point(focus_trace["xs"], focus_trace["ys"])
+            if label_point is not None:
+                fig.add_annotation(
+                    x=label_point[0],
+                    y=label_point[1],
+                    xanchor="left",
+                    yanchor="middle",
+                    text=focus_trace["country"],
+                    showarrow=False,
+                    font={"size": 11, "color": INK},
+                )
+
+    if first_period is not None and last_period is not None:
+        apply_overlays(
+            fig,
+            episode_overlays(
+                MACRO_EPISODES, date.fromisoformat(first_period), date.fromisoformat(last_period)
+            ),
+        )
     return fig
 
 
@@ -231,6 +310,7 @@ with tab_country:
         else:
             units = {o["unit"] for o in obs}
             if len(selected_indicators) == 1 and len(units) == 1:
+                periods = [o["period"] for o in obs]
                 st.plotly_chart(
                     line_chart(
                         chart_traces(obs, [selected_iso3]),
@@ -239,6 +319,15 @@ with tab_country:
                     ),
                     width="stretch",
                 )
+                band_caption = episode_captions(
+                    episodes_in_range(
+                        MACRO_EPISODES,
+                        date.fromisoformat(min(periods)),
+                        date.fromisoformat(max(periods)),
+                    )
+                )
+                if band_caption:
+                    st.caption(band_caption)
                 st.caption(chart_caption(obs))
             elif len(units) > 1:
                 st.warning(
@@ -300,6 +389,17 @@ with tab_comparison:
     if not comparison_countries:
         st.info("Select at least one country.")
     else:
+        # Focus-and-context (S18): the focus country wears its entity
+        # color; every other selected country renders in context grey so
+        # a ten-economy comparison never puts ten hues on screen. The
+        # matrix table below carries the numbers; hover carries
+        # per-point provenance on every line.
+        comparison_focus = st.selectbox(
+            "Focus country (others in grey)",
+            comparison_countries,
+            index=0,
+            format_func=lambda iso3: f"{iso3} — {country_labels[iso3]}",
+        )
         obs = [
             o
             for o in fetch_latest(API_URL, comparison_indicator, None)
@@ -313,14 +413,25 @@ with tab_comparison:
         else:
             traces = chart_traces(obs, comparison_countries)
             if traces:
+                periods = sorted({o["period"] for o in obs})
                 st.plotly_chart(
                     line_chart(
                         traces,
                         indicator_labels[comparison_indicator],
                         traces[0]["unit"],
+                        focus=comparison_focus,
                     ),
                     width="stretch",
                 )
+                band_caption = episode_captions(
+                    episodes_in_range(
+                        MACRO_EPISODES,
+                        date.fromisoformat(periods[0]),
+                        date.fromisoformat(periods[-1]),
+                    )
+                )
+                if band_caption:
+                    st.caption(band_caption)
                 st.caption(chart_caption(obs))
             st.dataframe(
                 comparison_matrix(obs, comparison_countries),
@@ -340,7 +451,10 @@ with tab_comparison:
                 hide_index=True,
             )
             st.caption(
-                "Latest vintage per period. Cells without an observation are "
+                "Latest vintage per period. The focus country is drawn in "
+                "its panel color, other selected countries in grey "
+                "(hover any line for per-point provenance; the matrix below "
+                "carries every value). Cells without an observation are "
                 "named missing (with reason when recorded) - never blank, "
                 "zero, or interpolated; the chart leaves gaps rather than "
                 "drawing through missing periods. Freshness is computed "
