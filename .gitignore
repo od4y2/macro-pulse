@@ -12,3 +12,7 @@ Configure-OpenCode-VolcengineArk-macOS.zsh
 setup_claude_glm52_mac_ark.zsh
 setup_opencode_glm52_ark_mac.zsh
 logs/
+.neon
+node_modules/
+.claude/
+skills-lock.json
