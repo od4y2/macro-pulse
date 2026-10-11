@@ -1,0 +1,13 @@
+# secrets and environments - never committed
+.env
+.env.local
+.env.*.local
+.streamlit/secrets.toml
+
+# python
+.venv/
+__pycache__/
+*.pyc
+
+# local artifacts
+logs/

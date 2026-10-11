@@ -1,0 +1,4 @@
+# Streamlit Community Cloud installs from this file. `.` builds the
+# macropulse package (and every runtime dependency it declares) from
+# pyproject.toml - single source of truth, no PYTHONPATH needed.
+.
