@@ -1,0 +1,57 @@
+=== S19 acceptance run (2026-10-11) ===
+
+--- 1. full test suite ---
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================= 598 passed, 1 warning in 11.39s ========================
+
+--- 2. S19 tests by name ---
+.....................................................                    [100%]
+53 passed in 0.09s
+
+--- 3. acceptance gate (the deliverable's own test) ---
+.                                                                        [100%]
+1 passed in 0.05s
+
+--- 4. smoke ---
+  from starlette.testclient import TestClient as TestClient  # noqa
+MacroPulse query service smoke test passed: {'status': 'ok', 'data_mode': 'database'}
+
+--- 5. ruff (src tests app scripts/report-qa.py - unit scope) ---
+All checks passed!
+
+--- 6. typeset registry validator (standalone) ---
+entries: 14
+validate_typeset: PASS
+
+--- 7. rendered-document QA (scripts/report-qa.py) ---
+S19 rendered-document QA run
+=============================
+document: docs/ResearchReport.md
+typeset formulas expected: 14
+cited repository paths: 52
+
+checks (each empty = pass):
+  formula presentation : PASS
+  citations resolvable : PASS
+  required sections    : PASS
+  banned phrases       : PASS
+  typeset registry     : PASS
+
+aggregate: PASS
+exit status: PASS
+
+wrote: evidence/S19/qa-run.txt
+wrote: evidence/S19/report.html
+
+--- 8. manual inspection notes ---
+Report sections: six contract headings present (scope/claims, data architecture, formulas, findings, limitations, reproducibility).
+Formula presentation: 14/14 typeset entries in display math, verified mechanically (check 1) and by eye against the registry.
+Citations: 52 repository paths cited in prose, all resolving on disk (check 2); every Findings number was re-verified against
+  the cited evidence file this session before the report was written.
+Prose: banned-phrase check PASS over the whole document after the NON_CLAIMS restatement was reworded in bounded language
+  (the verbatim restatement tripped the filter - the S16 no-exemption rule applied; details in design-notes.md).
+Renderer: evidence/S19/report.html structurally verified - 14 math divs, 15 tables (14 notation + 1
+  findings), 6 contract h2 sections, 5 formula-group h3s, 1 code block, MathJax tag present, no stray
+  unescaped $$ in body prose; opened in the browser for visual inspection.
+Pre-existing repo-wide lint findings (INIT/S03-era scripts/validate_structure.py, alembic files, frozen evidence demo scripts)
+  are out of S19 scope and left untouched - recorded, not silently fixed.

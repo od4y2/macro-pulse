@@ -40,3 +40,12 @@ Updated during WORKSPACE_AUDIT (2026-08-04); to be finalized in E01/E02.
 - Added to venv (and pyproject dependencies): sqlalchemy 2.0.52, alembic 1.19.1, psycopg[binary].
 - `PYTHONPATH=src alembic upgrade head` -> applied migration bcc78be651f0 to local dev DB.
 - `.venv` hidden-flag defect still open (E01); `PYTHONPATH=src` workaround unchanged.
+
+## S19 update (2026-10-11)
+- Measured toolchain at report-QA time (the reproducibility appendix cites this record):
+  - macOS 15.7.4 (Darwin 24.6.0, arm64); `.venv` Python 3.13.14 (Anaconda build; hidden-`.pth` defect still open for E01 - direct module commands still need `PYTHONPATH=src`).
+  - pytest 9.1.1, ruff 0.16.1, streamlit 1.62.0, plotly 7.0.0, fastapi 0.141.1, sqlalchemy 2.0.52, alembic 1.19.1.
+- Full suite: `python -m pytest` -> 598 passed, 1 warning (StarletteDeprecationWarning from fastapi's own testclient import of httpx; third-party, not project code).
+- Smoke: `PYTHONPATH=src python -m macropulse.smoke` -> passed (`status: ok, data_mode: database`).
+- Lint scope for acceptance: `ruff check src tests app scripts/report-qa.py` -> All checks passed. Repo-wide `ruff check .` still reports pre-existing INIT/S03-era findings (scripts/validate_structure.py, alembic/env.py, alembic/versions/bcc78be651f0) and frozen evidence demo scripts (evidence/S11, S12, S14 live-demo-script.py) - out of unit scope, left untouched.
+- Local demo stack after the session's deploy-branch excursion: uvicorn :8000 restarted (backed by local docker Postgres via .env.local DATABASE_URL - unchanged pre-S20 state; Neon holds the migrated data), streamlit :8130 up throughout.

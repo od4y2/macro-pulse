@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MacroPulse Research Report</title>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<style>
+body { background: #fdfdfc; color: #0b0b0b; max-width: 46rem;
+  margin: 3rem auto; padding: 0 1.5rem;
+  font-family: Inter, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 1.05rem; line-height: 1.65; }
+h1, h2, h3, h4 { font-family: Spectral, Georgia, 'Times New Roman',
+  serif; line-height: 1.25; }
+h1 { font-size: 2rem; margin-bottom: 0.25rem; }
+h2 { border-bottom: 1px solid #e1e0d9; padding-bottom: 0.3rem; }
+.math { margin: 1.2rem 0; overflow-x: auto; }
+table { border-collapse: collapse; margin: 1rem 0; font-size: 0.95rem; }
+th, td { border: 1px solid #e1e0d9; padding: 0.35rem 0.7rem;
+  text-align: left; }
+th { background: #f2f1ec; }
+code, pre { font-family: 'SF Mono', Menlo, monospace; font-size: 0.9em; }
+pre { background: #f6f5f0; padding: 0.8rem; overflow-x: auto; }
+</style>
+</head>
+<body>
+<h1>MacroPulse Research Report</h1>
+<p>MacroPulse is a global macroeconomic monitoring and statistical-blind-spot analysis platform: traceable public data in, transparent derived metrics, structured briefings, and an explicit claims boundary out. This document is the unit S19 deliverable - the complete report, the typeset methodology, the limitations, and the reproducibility appendix.</p>
+<p>Every value quoted below is observed, carried over from a validated repository artifact (an evidence file or a stored observation with full provenance), and cited to the file it was verified in. Values are stated as served - no rounding beyond what the cited artifact records. The report is a point-in-time record: each finding carries the date its evidence was captured, and later vintages may differ. No statement in this document goes beyond descriptive arithmetic on observed values.</p>
+<p>Date of record: October 2026. Unit sequence: S01-S19 under <code>prompts/GlobalEngineeringContract.md</code>.</p>
+<h2>Research scope and claims boundary</h2>
+<p>The locked scope lives in code (<code>src/macropulse/scope.py</code>) and is the single machine-readable source of truth for the questions, the panel, and the boundary. Four research questions drive the platform:</p>
+<ul>
+<li><strong>RQ1 (labor-slack-youth, S10):</strong> How do youth unemployment, NEET, and</li>
+</ul>
+<p>  school-to-work transition indicators diverge from headline unemployment   across the panel, and how does that divergence change across data vintages?</p>
+<ul>
+<li><strong>RQ2 (digital-inclusion, S11):</strong> How do internet, mobile, and</li>
+</ul>
+<p>  account-ownership rates co-vary with income and gender across the panel,   and where do measurement gaps hide digital exclusion?</p>
+<ul>
+<li><strong>RQ3 (payment-resilience-healthcare, S12):</strong> What do payment-outage</li>
+</ul>
+<p>  episodes reveal about resilience measurement in digitized healthcare   systems, for the case-study subset of the panel?</p>
+<ul>
+<li><strong>RQ4 (vintage-transparency, S07):</strong> Where do official release calendars,</li>
+</ul>
+<p>  revisions, and methodology breaks create systematic blind spots in   cross-country comparison?</p>
+<p>The country panel is ten economies, locked in S01: United States, China, Japan, Germany, United Kingdom, India, Brazil, South Korea, South Africa, and Mexico - a balanced set chosen for coverage across the three data systems (FRED mirrors, World Bank, ILOSTAT), not for outcomes.</p>
+<p>The claims boundary is a closed list (<code>macropulse.scope.NON_CLAIMS</code>), restated below in bounded wording: this document is itself scanned by the platform&#x27;s banned-phrase filter with no exemption, and the S16 lesson is that a disclaimer using banned phrasing is textually identical, to the check, to the thing it disclaims. In the boundary&#x27;s own register:</p>
+<ul>
+<li>No causal claims about macroeconomic outcomes without documented evidence.</li>
+<li>No financial guidance, price objectives, or trade directives.</li>
+<li>No fabricated values, release dates, citations, or test results.</li>
+<li>No presentation of synthetic, mocked, or cached data as observed data.</li>
+<li>AI-generated prose derives only from validated structured inputs.</li>
+<li>No claims of live API, cloud deployment, or production status without</li>
+</ul>
+<p>  evidence.</p>
+<ul>
+<li>Cross-country comparisons are descriptive, not rankings or scores of</li>
+</ul>
+<p>  merit.</p>
+<p>Every dataset and observation carries one evidence label from a closed vocabulary: <code>real</code> (live-retrieved from the provider API), <code>synthetic</code> (test fixture, never presented as observed), <code>mocked</code> (deterministic no-key fixture), <code>cached</code> (reserved; the refresh layer stores real data or records failure - no cached rows are emitted), and <code>external</code> (document-verified registry entry; a document, never an API observation). Quality grades use the S07 closed vocabulary (<code>official</code>, <code>revised</code>, <code>flagged</code>, <code>ungraded</code>, plus reserved <code>preliminary</code> and <code>estimated</code>); grade meanings are surfaced verbatim in the dashboard. The full scope statement is published in <code>docs/ResearchScope.md</code> and the data governance rules in <code>docs/DataGovernance.md</code>.</p>
+<h2>Data architecture and provenance</h2>
+<p><strong>Sources.</strong> FRED (and its vintage archive ALFRED) for United States series; the World Bank indicator API v2 for the cross-country panel; ILOSTAT for NEET; and official government documents, verified live and quoted verbatim, for the payment-resilience case study. The indicator catalog (<code>src/macropulse/catalog.py</code>) records, for each of the twelve indicators: unit, frequency, seasonal adjustment, primary and fallback source codes, comparability notes, and limitations - published as <code>docs/IndicatorCatalog.md</code>.</p>
+<p><strong>Pipeline.</strong> Connectors (<code>src/macropulse/connectors/fred.py</code>, <code>src/macropulse/connectors/worldbank.py</code>, <code>src/macropulse/connectors/ilostat.py</code>) fetch and archive raw payloads; normalization (<code>src/macropulse/pipeline/normalize.py</code>) maps them onto one observation schema; quality control stamps grades and names missingness (<code>src/macropulse/quality/assessment.py</code>, <code>src/macropulse/quality/missingness.py</code>); vintage control (<code>src/macropulse/quality/vintage.py</code>) keeps every vintage as a distinct stored identity. Derived metrics are computed by the S08/S09 engine (<code>src/macropulse/metrics/engine.py</code>) behind publication gates (<code>src/macropulse/metrics/gates.py</code>). A FastAPI query service (<code>src/macropulse/api/main.py</code>) serves the data under pinned response schemas, and the Streamlit dashboard (<code>app/dashboard.py</code>) is a thin HTTP client over it (<code>src/macropulse/views/client.py</code>).</p>
+<p><strong>Storage.</strong> PostgreSQL under Alembic migrations: a raw archive (<code>raw_observations</code>), the normalized observation store, a derived-metrics store with lineage, and audit tables for refresh and briefing runs (<code>docs/DatabaseContract.md</code>). Every normalized observation preserves nine provenance fields (the S01 contract): <code>period</code>, <code>release_time</code>, <code>retrieval_time</code>, <code>vintage</code>, <code>unit</code>, <code>frequency</code>, <code>seasonal_adjustment</code>, <code>source</code>, and <code>quality_grade</code>. Superseded vintages are retained - nothing is overwritten - so a value can always be traced to the release that carried it. The operational database is a Neon-managed Postgres instance; the full-data migration to it was verified with 12-table parity on 2026-09-18 (recorded in <code>docs/decisions.md</code>). Public cloud hosting is in rehearsal and is S20 scope; no live-deployment claim is made here.</p>
+<p><strong>The three faces of every formula.</strong> Each formula exists as code (the computing function), as registry text (what the methodology API serves), and - new in this unit - as typeset math (<code>src/macropulse/report/formulas.py</code>). The typeset layer is anchored: every registry-backed entry carries the registry&#x27;s exact current text, and quantities without a registry entry (Spearman rank covariation, panel coverage) are anchored to their computing functions by import. A validator reports drift in either direction, so a registry edit that leaves the report behind is a reported problem, never silent divergence.</p>
+<h2>Formula presentation</h2>
+<p>All fourteen quantities the platform computes are presented below in scientific notation, exactly as the typeset registry holds them. Notation tables define every symbol; guard conditions state when a quantity is missing rather than computed.</p>
+<h3>Metric transforms (S08)</h3>
+<p><strong>Percent change over a lag of L months</strong> (<code>pct_change</code>; requires a positive non-zero base; missing inputs stay missing):</p>
+<div class="math">$$100\,\left(\frac{v_t}{v_{t-L}} - 1\right)$$</div>
+<table><thead><tr>
+<th>symbol</th>
+<th>meaning</th>
+</tr></thead><tbody>
+<tr>
+<td>$v_t$</td>
+<td>value at period t</td>
+</tr>
+<tr>
+<td>$L$</td>
+<td>lag in months (positive integer)</td>
+</tr>
+</tbody></table>
+<p><strong>Year-over-year percent change</strong> (<code>yoy</code>; pct_change with L = 12 months - same period one year earlier):</p>
+<div class="math">$$100\,\left(\frac{v_t}{v_{t-12\,\mathrm{m}}} - 1\right)$$</div>
+<table><thead><tr>
+<th>symbol</th>
+<th>meaning</th>
+</tr></thead><tbody>
+<tr>
+<td>$v_t$</td>
+<td>value at period t</td>
+</tr>
+<tr>
+<td>$v_{t-12\,\mathrm{m}}$</td>
+<td>same period one year earlier</td>
+</tr>
+</tbody></table>
+<p><strong>Month-over-month percent change</strong> (<code>mom</code>; pct_change with L = 1 month; monthly series only):</p>
+<div class="math">$$100\,\left(\frac{v_t}{v_{t-1\,\mathrm{m}}} - 1\right)$$</div>
+<table><thead><tr>
+<th>symbol</th>
+<th>meaning</th>
+</tr></thead><tbody>
+<tr>
+<td>$v_t$</td>
+<td>value at period t</td>
+</tr>
+<tr>
+<td>$v_{t-1\,\mathrm{m}}$</td>
+<td>the previous month (monthly series only)</td>
+</tr>
+</tbody></table>
+<p><strong>Percentage-point change over a lag of L months</strong> (<code>pp_change</code>; for rate-type series where percent-of-percent is meaningless; defined for any sign of input):</p>
+<div class="math">$$\delta_t = v_t - v_{t-L}$$</div>
+<table><thead><tr>
+<th>symbol</th>
+<th>meaning</th>
+</tr></thead><tbody>
+<tr>
+<td>$\delta_t$</td>
+<td>percentage-point change</td>
+</tr>
+<tr>
+<td>$v_t$</td>
+<td>value at period t</td>
+</tr>
+<tr>
+<td>$L$</td>
+<td>lag in months</td>
+</tr>
+</tbody></table>
+<p><strong>Annualized percent rate from a period-over-period change</strong>  (<code>annualized_pct</code>; requires 12 % L == 0 - whole compounding periods per year):</p>
+<div class="math">$$100\,\left(\left(1 + \frac{r}{100}\right)^{12/L} - 1\right)$$</div>
+<table><thead><tr>
+<th>symbol</th>
+<th>meaning</th>
+</tr></thead><tbody>
+<tr>
+<td>$r$</td>
+<td>period-over-period percent change (in percent)</td>
+</tr>
+<tr>
+<td>$12/L$</td>
+<td>whole compounding periods per year (12 % L == 0)</td>
+</tr>
+</tbody></table>
+<p><strong>Trailing arithmetic mean</strong> (<code>rolling_mean</code>; over the last W consecutive periods; every window member must exist with a non-NULL value - partial windows are missing, never half-computed):</p>
+<div class="math">$$\bar{v}_t = \frac{1}{W}\sum_{i=0}^{W-1} v_{t-i}$$</div>
+<table><thead><tr>
+<th>symbol</th>
+<th>meaning</th>
+</tr></thead><tbody>
+<tr>
+<td>$\bar{v}_t$</td>
+<td>trailing mean at period t</td>
+</tr>
+<tr>
+<td>$W$</td>
+<td>window length in periods (frequency steps)</td>
+</tr>
+<tr>
+<td>$v_{t-i}$</td>
+<td>the i-th previous period; every member must exist</td>
+</tr>
+</tbody></table>
+<h3>Robust standardization (S09)</h3>
+<p><strong>Robust fixed-window standardization</strong> (<code>robust_z</code>; over the trailing N consecutive periods, direction-adjusted so positive = favorable; window occupancy of at least 3 non-missing members is required; zero MAD is missing with reason <code>zero_scale</code>, never fabricated):</p>
+<div class="math">$$z_t = \frac{v_t - \operatorname{median}(W_t)}{\operatorname{MAD}(W_t)}$$</div>
+<table><thead><tr>
+<th>symbol</th>
+<th>meaning</th>
+</tr></thead><tbody>
+<tr>
+<td>$z_t$</td>
+<td>robust standardized score (direction-adjusted so positive = favorable)</td>
+</tr>
+<tr>
+<td>$W_t$</td>
+<td>the trailing N consecutive periods (frequency step)</td>
+</tr>
+<tr>
+<td>$\operatorname{median}(W_t)$</td>
+<td>window median</td>
+</tr>
+<tr>
+<td>$\operatorname{MAD}(W_t)$</td>
+<td>window median absolute deviation</td>
+</tr>
+</tbody></table>
+<h3>Labor lens relationships (S10)</h3>
+<p><strong>Youth-headline unemployment divergence</strong> (<code>youth_headline_gap</code>; the RQ1 divergence measure; only computed when both inputs exist, never imputed; dual-anchored to the metric and labor registries):</p>
+<div class="math">$$g_t = u^{\mathrm{youth}}_t - u^{\mathrm{headline}}_t$$</div>
+<table><thead><tr>
+<th>symbol</th>
+<th>meaning</th>
+</tr></thead><tbody>
+<tr>
+<td>$g_t$</td>
+<td>divergence in percentage points (positive = youth worse)</td>
+</tr>
+<tr>
+<td>$u^{\mathrm{youth}}_t$</td>
+<td>youth unemployment rate</td>
+</tr>
+<tr>
+<td>$u^{\mathrm{headline}}_t$</td>
+<td>headline unemployment rate</td>
+</tr>
+</tbody></table>
+<p><strong>Youth-to-headline unemployment ratio</strong> (<code>youth_ratio</code>; reported alongside the pp gap; level-dependent; None on zero headline):</p>
+<div class="math">$$R_t = \frac{u^{\mathrm{youth}}_t}{u^{\mathrm{headline}}_t}$$</div>
+<table><thead><tr>
+<th>symbol</th>
+<th>meaning</th>
+</tr></thead><tbody>
+<tr>
+<td>$R_t$</td>
+<td>unitless multiple; None on zero headline</td>
+</tr>
+<tr>
+<td>$u^{\mathrm{youth}}_t$</td>
+<td>youth unemployment rate</td>
+</tr>
+<tr>
+<td>$u^{\mathrm{headline}}_t$</td>
+<td>headline unemployment rate</td>
+</tr>
+</tbody></table>
+<p><strong>NEET minus headline unemployment</strong> (<code>neet_minus_unemployed</code>; measures the withdrawn/discouraged component of youth disengagement not visible in unemployment):</p>
+<div class="math">$$d_t = \mathrm{NEET}_t - u^{\mathrm{headline}}_t$$</div>
+<table><thead><tr>
+<th>symbol</th>
+<th>meaning</th>
+</tr></thead><tbody>
+<tr>
+<td>$d_t$</td>
+<td>withdrawn/discouraged component, in percentage points</td>
+</tr>
+<tr>
+<td>$\mathrm{NEET}_t$</td>
+<td>NEET rate (not in education, employment or training)</td>
+</tr>
+<tr>
+<td>$u^{\mathrm{headline}}_t$</td>
+<td>headline unemployment rate</td>
+</tr>
+</tbody></table>
+<h3>Digital lens relationships (S11)</h3>
+<p><strong>Account-internet gap</strong> (<code>account_internet_gap</code>; financial exclusion among the connected; denominators differ - adults vs population - a documented comparability limitation, reported unadjusted):</p>
+<div class="math">$$g_t = a_t - i_t$$</div>
+<table><thead><tr>
+<th>symbol</th>
+<th>meaning</th>
+</tr></thead><tbody>
+<tr>
+<td>$g_t$</td>
+<td>exclusion among the connected, in percentage points</td>
+</tr>
+<tr>
+<td>$a_t$</td>
+<td>account ownership, share of adults</td>
+</tr>
+<tr>
+<td>$i_t$</td>
+<td>internet usage, share of population</td>
+</tr>
+</tbody></table>
+<p><strong>Gender account gap</strong> (<code>gender_account_gap</code>; conservative proxy - the male series is not in the locked catalog, and the all-adult average includes women, understating the female deficit):</p>
+<div class="math">$$g_t = a^{\mathrm{female}}_t - a^{\mathrm{all\ adults}}_t$$</div>
+<table><thead><tr>
+<th>symbol</th>
+<th>meaning</th>
+</tr></thead><tbody>
+<tr>
+<td>$g_t$</td>
+<td>conservative gender gap, in percentage points (negative = women below the national average)</td>
+</tr>
+<tr>
+<td>$a^{\mathrm{female}}_t$</td>
+<td>female account ownership</td>
+</tr>
+<tr>
+<td>$a^{\mathrm{all\ adults}}_t$</td>
+<td>all-adult account ownership</td>
+</tr>
+</tbody></table>
+<h3>Quantities anchored to code</h3>
+<p><strong>Spearman rank covariation</strong> (<code>spearman_rho</code>; computed by <code>src/macropulse/lenses/digital.py</code> - always reported with its panel size n; ties share average ranks):</p>
+<div class="math">$$\rho = 1 - \frac{6 \sum_{i=1}^{n} d_i^2}{n\,(n^2 - 1)}$$</div>
+<table><thead><tr>
+<th>symbol</th>
+<th>meaning</th>
+</tr></thead><tbody>
+<tr>
+<td>$\rho$</td>
+<td>Spearman rank correlation; always reported with n</td>
+</tr>
+<tr>
+<td>$d_i$</td>
+<td>rank difference of the i-th economy (ties share average ranks)</td>
+</tr>
+<tr>
+<td>$n$</td>
+<td>panel size (10 economies)</td>
+</tr>
+</tbody></table>
+<p><strong>Panel coverage</strong> (<code>panel_coverage</code>; computed by <code>src/macropulse/metrics/standardize.py</code> as a ratio of sums - the S09 publication gate reads it):</p>
+<div class="math">$$C = \frac{\sum_{c} n^{\mathrm{obs}}_c}{\sum_{c} n^{\mathrm{exp}}_c}$$</div>
+<table><thead><tr>
+<th>symbol</th>
+<th>meaning</th>
+</tr></thead><tbody>
+<tr>
+<td>$C$</td>
+<td>panel coverage as a ratio of sums (S09)</td>
+</tr>
+<tr>
+<td>$n^{\mathrm{obs}}_c$</td>
+<td>observed points for economy c</td>
+</tr>
+<tr>
+<td>$n^{\mathrm{exp}}_c$</td>
+<td>expected points for economy c</td>
+</tr>
+</tbody></table>
+<h2>Findings</h2>
+<p>Findings are descriptive statements about observed values, cited to the evidence file each was verified in. They are not causal statements, statements about policy, or statements about any period after the cited capture date.</p>
+<p><strong>Youth divergence separates economies the headline rate alone does not (RQ1).</strong> Full-component profiles (WB unemployment, WB youth unemployment, ILOSTAT NEET; all <code>real</code>; aligned to the latest period covered by all series; captured 2026-08-29 in <code>evidence/S10/live-lens-demo.md</code>):</p>
+<table><thead><tr>
+<th>economy</th>
+<th>period</th>
+<th>headline</th>
+<th>youth</th>
+<th>NEET</th>
+<th>youth-headline gap</th>
+<th>NEET-headline gap</th>
+</tr></thead><tbody>
+<tr>
+<td>USA</td>
+<td>2025-01-01</td>
+<td>4.198</td>
+<td>9.34</td>
+<td>11.59</td>
+<td>5.1pp</td>
+<td>7.4pp</td>
+</tr>
+<tr>
+<td>ZAF</td>
+<td>2024-01-01</td>
+<td>32.279</td>
+<td>60.248</td>
+<td>34.61</td>
+<td>28.0pp</td>
+<td>2.3pp</td>
+</tr>
+<tr>
+<td>BRA</td>
+<td>2025-01-01</td>
+<td>5.97</td>
+<td>13.981</td>
+<td>18.703</td>
+<td>8.0pp</td>
+<td>12.7pp</td>
+</tr>
+</tbody></table>
+<p>School-enrollment was unfetched in these profiles and is named as <code>component_not_fetched</code> rather than hidden. The arithmetic contrast is the finding: South Africa&#x27;s 28.0pp youth-headline gap comes with only a 2.3pp NEET-headline gap (youth disengagement there is mostly recorded as active job search), while Brazil&#x27;s smaller 8.0pp gap comes with a 12.7pp NEET-headline gap (a larger withdrawn component). Gap and ratio are reported together precisely so level differences like these stay visible. ZAF&#x27;s profile aligns to 2024, not 2025 - ILOSTAT&#x27;s NEET series ends a year earlier than the WB unemployment series, and the profile keeps the common period rather than blending.</p>
+<p><strong>Digital reach co-moves with income, and the two gaps separate economies that reach levels alone do not (RQ2).</strong> Panel-wide (all <code>real</code>, live World Bank API, captured 2026-08-29 in <code>evidence/S11/live-lens-demo.md</code>): account ownership and internet usage rank-correlate with GDP per capita PPP at rho = +0.70 and +0.82 respectively (n = 10 - a small panel; the coefficient is always reported with n). Mexico pairs moderate connectivity (83.1% internet, 2024) with the panel&#x27;s deepest financial exclusion among the connected (account-internet gap -30.1pp) and the largest female account deficit (-5.6pp against the all-adult average); India shows +24.1pp account-above-internet (financial reach ahead of connectivity - a descriptive observation, not an explanation); gender gaps are near zero in high-income economies (USA +0.1, GBR -0.0) and widest in MEX (-5.6) and BRA (-4.1). Three measurement findings came out of the same run: the World Bank API returns NULL placeholder rows for unpublished years (USA internet carried 31 NULL rows; Findex series 61), which the connector maps to explicit missingness; Japan&#x27;s four-component profile aligns to 2021, not 2024, and that binding constraint is shown rather than hidden (mobile ends 2023 and Findex has no 2022/2023 observations); and the panel&#x27;s Findex waves are 2011/2014/2017/2021/2024 - the catalog&#x27;s coverage text was corrected against the live source and recorded in the same evidence file.</p>
+<p><strong>Documented outage episodes show a recurring, scheduled resilience cost (RQ3).</strong> The case-study registry (<code>src/macropulse/case_study/episodes.py</code>, published as <code>docs/PaymentResilienceCaseStudy.md</code>) holds four machine-verified Yunnan medical-insurance payment-outage episodes, each external-labelled and citation-mandatory, verified 2026-08-29 in <code>evidence/S12/live-verification.md</code>: year-end rollover suspensions of 48 hours each (2024-12-31 20:00 to 2025-01-02 20:00, and 2025-12-31 20:00 to 2026-01-02 20:00), an 8-hour platform upgrade (2026-03-24 22:00 to 2026-03-25 06:00), and a 2-hour upgrade (2026-06-12 23:00 to 2026-06-13 01:00). The year-end 48-hour suspension is recurring under provincial unified arrangement - a scheduled, announced resilience cost, distinct from failures. The healthcare-geography record for the same lens: China&#x27;s 2023 NHC bulletin reports 1,070,785 institutions and 10,174,000 beds nationwide (machine-extracted verbatim); Yunnan records 28,765 institutions and 359,900 beds &quot;as of 2023&quot; (Yunnan Daily, quoted verbatim). 29 of 31 provinces have no verified record and are explicitly listed as unrecorded - named missingness, never imputed. Sources that failed verification (a scanned-image PDF with no text layer, an HTML-returned PDF endpoint, a TLS-mismatched mirror, an unreachable bulletin) are excluded from the registry and listed with their failure modes.</p>
+<p><strong>Revisions are real, stored, and revisable-in-place (RQ4).</strong> Live ALFRED verification (captured 2026-08-29 in <code>evidence/S07/live-alfred-verification.md</code>): the same identity - January 2023 nonfarm payrolls - first reported 155,073 (vintage 2023-02-03) was revised to 154,773 by the 2024-04-01 vintage: an absolute change of -300.0 thousand and a relative change of -0.001934572749608249 (the annual benchmark revision). Both vintages are distinct stored identities. In the same run, UNRATE for early 2023 did not change between the two realtime windows examined (value 3.4 for 2023-01 at vintage 2023-04-01 in both) - recorded as the honest observation it is, not as a claim about revision behavior in general.</p>
+<p><strong>The refresh layer is idempotent and failure-honest.</strong> The S17 refresh evidence (<code>evidence/S17/live-demo-output.txt</code>, captured 2026-09-10): a live World Bank pass stored 66 points per economy for real GDP growth across all ten economies (660 rows); a FRED series attempted without an API key failed safely with reason <code>no_api_key</code> and stored nothing; the recovery run with the key stored 866 points of FEDFUNDS spanning 1954-07-01 to 2026-08-01; an immediate re-run of the first pass stored zero new rows and reported all 660 points unchanged. Every series outcome is audit-logged per run with new/revised/unchanged counts.</p>
+<p><strong>The full chain holds end to end.</strong> The S18 live demonstration (<code>evidence/S18/live-demo-output.txt</code>, captured 2026-09-24): ten economies ingested with 66 annual points each (1960-01-01 to 2025-01-01, coverage 0.985 per series, publication gate passed) producing 63 derived robust-standardized scores per economy; the served USA 2020 real-GDP- growth row (-2.081375977796 percent per year, vintage 2026-09-24, evidence <code>real</code>, source world_bank/NY.GDP.MKTP.KD.ZG) matched the stored row byte-for-byte on all six provenance-carrying fields; the derived robust-standardized score for USA 2020 (-8.91953625571653) served with its formula reference and lineage; the S16 briefing leg served 660 observations, derived 650 facts with 10 named missing and 0 excluded, and validated 30 of 30 built claims with no banned phrase in the rendered document; and the 2020 pandemic-window case presents the observed 2020 panel values beside the documented episode (WHO&#x27;s pandemic characterization of 11 March 2020, live-verified and quoted in <code>evidence/S18/live-verification.md</code>).</p>
+<p><strong>Claims are validated, and the validation layer rejects.</strong> The S16 evidence (<code>evidence/S16/live-demo-output.txt</code>, captured 2026-09-01): 20 of 20 level and change claims built from 110 served observations were validated against the structured facts; a deliberately tampered value claim was rejected with reason <code>value_mismatch</code>, and a causal sentence was rejected by the banned-phrase filter (<code>causal_phrase</code>) - both recorded in the persisted run (21 claims stored: 20 validated, 1 rejected). AI prose in this platform is a deterministic template over validated claims only (<code>src/macropulse/briefing/prose.py</code>); rejected text never reaches the document.</p>
+<h2>Limitations</h2>
+<ul>
+<li><strong>Panel size.</strong> The panel is ten economies. Rank correlations are</li>
+</ul>
+<p>  reported with n = 10 always; they describe this panel, not the world.</p>
+<ul>
+<li><strong>Point-in-time record.</strong> Every finding is anchored to its capture date</li>
+</ul>
+<p>  (2026-08-29 to 2026-09-24). Later vintages may differ; the platform   stores all vintages, and this document does not track them beyond its   date of record.</p>
+<ul>
+<li><strong>Missing components are named, not filled.</strong> School-enrollment was not</li>
+</ul>
+<p>  fetched in the RQ1 profiles shown (<code>component_not_fetched</code>); 29 of 31   Chinese provinces have no verified record in the case study; the   reserved <code>preliminary</code> and <code>estimated</code> quality grades are unused since   no source exposes release-stage metadata.</p>
+<ul>
+<li><strong>Comparability is documented, not corrected.</strong> The account-internet gap</li>
+</ul>
+<p>  subtracts an adults-denominated share from a population-denominated   share; the gender account gap is a conservative proxy (no male series   in the locked catalog, and the all-adult average includes women);   seasonal-adjustment regimes differ across sources; per-indicator   comparability notes live in the catalog and are surfaced in the   dashboard.</p>
+<ul>
+<li><strong>Alignment trades freshness for truth.</strong> Lens profiles align to the</li>
+</ul>
+<p>  latest period with all components observed - so Japan&#x27;s digital profile   is 2021, not 2024, and ZAF&#x27;s labor profile is 2024, not 2025. Staler   components are shown as the binding constraint rather than mixed.</p>
+<ul>
+<li><strong>Revision evidence is exemplary, not exhaustive.</strong> The RQ4 finding</li>
+</ul>
+<p>  demonstrates the vintage machinery on one revision chain and one   no-revision observation across two realtime windows; it is not a survey   of revision incidence.</p>
+<ul>
+<li><strong>External evidence is document-verified.</strong> Case-study episodes and</li>
+</ul>
+<p>  geography figures come from official documents, verified live and   quoted verbatim; a scanned-image PDF that could not be   machine-verified was excluded rather than recorded.</p>
+<ul>
+<li><strong>No causal, advisory, or forward-looking content.</strong> The banned-phrase</li>
+</ul>
+<p>  filter runs on briefing documents, and this report was written to the   same standard and checked by the same machinery - the QA run recorded in   <code>evidence/S19/qa-run.txt</code> shows the checks and their results.</p>
+<ul>
+<li><strong>Derivation guards bound the metrics.</strong> robust_z requires window</li>
+</ul>
+<p>  occupancy of at least 3 non-missing members and reports zero MAD as   missing (<code>zero_scale</code>); rolling means require full windows; percent   changes require positive non-zero bases; annualization requires whole   compounding periods (12 % L == 0).</p>
+<h2>Reproducibility appendix</h2>
+<p>The measured toolchain (interpreter, package versions, OS) is recorded in <code>docs/EnvironmentRecord.md</code> and was appended to during this unit. The test suite is the acceptance instrument: <code>python -m pytest</code> runs the full suite including this report&#x27;s own gate, and <code>python -m macropulse.smoke</code> runs the platform smoke check.</p>
+<p><strong>Repository layout for reproduction.</strong> Scope in <code>src/macropulse/scope.py</code>; catalog in <code>src/macropulse/catalog.py</code>; connectors, normalization, quality, vintage control, metrics engine, lenses, case-study registries, briefing layer, ops refresh, API service, and views under <code>src/macropulse/</code>. Unit docs under <code>docs/</code> (for example <code>docs/TransformationRules.md</code>, <code>docs/StandardizationRules.md</code>, <code>docs/QualityGovernance.md</code>); unit evidence under <code>evidence/</code> (S01 through S19); the engineering contract in <code>prompts/GlobalEngineeringContract.md</code>; decisions history in <code>docs/decisions.md</code> and <code>docs/CoBuildLog.md</code>.</p>
+<p><strong>Commands (from the repository root).</strong></p>
+<pre><code># environment
+python -m venv .venv
+.venv/bin/python -m pip install -e &#x27;.[dev]&#x27;
+
+# acceptance
+.venv/bin/python -m pytest
+.venv/bin/python -m macropulse.smoke
+
+# lint
+.venv/bin/ruff check .
+
+# database migrations (Postgres connection via DATABASE_URL)
+.venv/bin/alembic upgrade head
+
+# query service + dashboard
+PYTHONPATH=src .venv/bin/python -m uvicorn macropulse.api.main:app --port 8000
+PYTHONPATH=src .venv/bin/streamlit run app/dashboard.py
+
+# scheduled-refresh entrypoint (S17)
+PYTHONPATH=src .venv/bin/python -m macropulse.ops.refresh --indicator gdp_real_growth</code></pre>
+<p>API keys and database URLs live only in gitignored <code>.env.local</code> and are sourced into the process environment at run time; they are never printed or committed. The FRED connector runs without a key in deterministic fixture mode (evidence label <code>mocked</code>), so the suite reproduces without secrets; live runs carry the <code>real</code> label and record their retrieval times.</p>
+<p><strong>This report&#x27;s own QA.</strong> <code>scripts/report-qa.py</code> runs the rendered-document QA checks over this file - formula presentation (all fourteen typeset formulas present in display math, exactly), citations (every cited repository path exists on disk), structure (all contract sections), and the claims boundary (the banned-phrase filter over the whole document) - and writes the machine-readable result to <code>evidence/S19/qa-run.txt</code> together with a deterministic standalone HTML rendering of this document (MathJax typesetting) at <code>evidence/S19/report.html</code>. The checks are implemented in <code>src/macropulse/report/qa.py</code> and tested in <code>tests/test_report_qa.py</code>; the typeset registry is in <code>src/macropulse/report/formulas.py</code> and tested in <code>tests/test_report_formulas.py</code>. The acceptance gate for this deliverable is the test <code>test_real_report_passes_qa</code>, which runs the full check set over this document and requires an empty problem list.</p>
+</body>
+</html>
