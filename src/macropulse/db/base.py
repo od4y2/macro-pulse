@@ -20,7 +20,7 @@ DEFAULT_DATABASE_URL = (
 
 
 def database_url() -> str:
-    return os.environ.get("DATABASE_URL", DEFAULT_DATABASE_URL)
+    return os.environ.get("NEON_DATABASE_URL", DEFAULT_DATABASE_URL)
 
 
 def make_engine(url: str | None = None) -> Engine:

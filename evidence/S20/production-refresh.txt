@@ -1,0 +1,74 @@
+S20 production refresh — full catalog against the production Neon database
+=========================================================================
+Run date: 2026-10-11 (UTC 15:38–16:58), operator-invoked, session evidence.
+Target: Neon project blue-rice-74949654, branch "production", database "neondb"
+(the go-live store migrated+verified 2026-09-18). Connection string read from
+the gitignored .env.local at invocation time; it is not recorded here.
+
+Invocation (run 5, full plan — 111 series):
+
+    NEON="$(grep '^NEON_DATABASE_URL=' .env.local | cut -d= -f2- | tr -d '"')"
+    export DATABASE_URL="${NEON/#postgresql:\/\//postgresql+psycopg://}"
+    export FRED_API_KEY="$(grep '^FRED_API_KEY=' .env.local | cut -d= -f2)"
+    PYTHONPATH=src .venv/bin/python -m macropulse.ops.refresh \
+        --trigger manual --log-file <session-dir>/refresh-production.jsonl
+
+Result: run_finished run_id=5 status=partial "4 of 111 series failed", exit=1.
+
+  series_finished 111  ok 107  failed 4
+  points_fetched 7,863  (106 ok WB series x 66 points + FEDFUNDS 867 points,
+                         1954-07..2026-09; the 4 failed series fetched but
+                         persisted nothing and count 0 in the ok-sum)
+  new_periods      1    policy_rate/USA (FEDFUNDS 2026-09, first observation)
+  revised_periods 293  across 12 series
+  unchanged      7,569
+
+Live World Bank revisions recorded (normalized rows rewritten with later
+vintage; prior vintages preserved — RQ4 chain grows in production):
+  cpi_inflation: JPN 36, MEX 33, USA 31, ZAF 31, GBR 30, IND 29, KOR 29,
+                 CHN 23, DEU 21, BRA 18  (all 10 panel economies revised)
+  neet_rate:     GBR 11, DEU 1
+
+The 4 failed series (status=failed, reason=persist_error, both attempts):
+  account_ownership_pct/USA, account_ownership_pct/DEU,
+  health_expenditure_pct_gdp/GBR, health_expenditure_pct_gdp/IND
+Failure mode: psycopg.OperationalError "consuming input failed: server closed
+the connection unexpectedly" during the raw-observations INSERT — the Findex /
+health-expenditure batches carry a ~20KB JSON payload per point (66 points per
+series), and the Neon pooled connection dropped mid-statement. Per-series
+isolation (S17) aborted the whole series transaction before any normalized
+write, so the store was left untouched for those series.
+
+Recovery (run 6, the documented S17 recovery path):
+
+    PYTHONPATH=src .venv/bin/python -m macropulse.ops.refresh \
+        --trigger recovery --indicator account_ownership_pct \
+        --country USA --country DEU --indicator health_expenditure_pct_gdp \
+        --country GBR --country IND --log-file <session-dir>/refresh-recovery.jsonl
+
+(The CLI filters cross the indicator and country lists, so the recovery plan
+was 8 series: both indicators x the four countries — the four already-OK
+series re-verified as a superset.)
+
+Result: run_finished run_id=6 status=succeeded, exit=0.
+  8/8 series ok; every series new_periods=0 revised_periods=0 unchanged=66.
+
+Interpretation (recorded honestly):
+- The failed series' normalized data was already in the store and already
+  current (unchanged=66 on re-fetch): the September migration had carried
+  complete Findex/health-expenditure series, and the aborted transactions
+  wrote nothing, so no stale or partial state ever existed. The recovery run
+  re-verified rather than repaired.
+- Full-catalog state is therefore verified current as of 2026-10-11 across
+  all 111 planned series: 12 indicators x covered countries + FEDFUNDS/USA.
+- The persist_error on fat-payload batches is a real production finding: the
+  per-series raw INSERT with ~1.3MB of JSON payloads can exceed the Neon
+  pooled connection's patience. Recorded for the C01/C02 reserve units as a
+  candidate hardening item (batch-size split or pre-ping), NOT fixed in S20.
+
+Secret-leak check before archiving (both logs grep-checked for the FRED API
+key value and the Neon password fragment): absent from both log files.
+
+Audit trail: refresh_runs rows 5 (trigger=manual, partial) and 6
+(trigger=recovery, succeeded) are persisted in the production database
+itself. Raw JSONL logs retained in the session directory (not the repo).
