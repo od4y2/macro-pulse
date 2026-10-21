@@ -8,6 +8,7 @@ errors - never fabricated rows on failure.
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import urlparse
 
 import httpx
 
@@ -15,6 +16,13 @@ import httpx
 DEFAULT_PAGE_SIZE = 500
 DEFAULT_BASE_URL = "http://127.0.0.1:8000"
 REQUEST_TIMEOUT = 30.0
+
+_LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
+
+
+def _is_loopback(url: str) -> bool:
+    # urlparse().hostname is already lowercase and bracket-free ("::1")
+    return (urlparse(url).hostname or "") in _LOOPBACK_HOSTS
 
 
 class QueryServiceError(RuntimeError):
@@ -55,7 +63,17 @@ class QueryServiceClient:
 
     def _request(self, path: str, params: dict[str, str]) -> httpx.Response:
         """One GET; transport failures and non-200s become QueryServiceError."""
-        with httpx.Client(transport=self._transport, timeout=self._timeout) as client:
+        # Loopback calls must never be routed through a proxy: with
+        # trust_env, httpx picks up OS-level proxy settings (on macOS the
+        # system-wide proxy, e.g. a local Clash-style listener), which
+        # answers loopback destinations with HTTP 502 - the query service
+        # never sees the request. Non-loopback base URLs keep the default
+        # environment-driven behavior.
+        with httpx.Client(
+            transport=self._transport,
+            timeout=self._timeout,
+            trust_env=not _is_loopback(self._base_url),
+        ) as client:
             try:
                 response = client.get(f"{self._base_url}{path}", params=params)
             except httpx.HTTPError as exc:
