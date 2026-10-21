@@ -183,6 +183,43 @@ _NHC_2023_URL = (
 _BJ_2023_URL = "http://www.phic.org.cn/tjsj/wstjgb/202408/P020240819586687344254.pdf"
 _YNDAILY_URL = "https://www.yndaily.com/html/2024/yaowenyunnan_0925/129208.html"
 
+# --- S20 province-expansion source URLs (verified live 2026-10-11..16) --------
+_TJ_2025_ECON = "https://stats.tj.gov.cn/tjsj_52032/tjgb/202603/t20260323_7267486.html"
+_HB_2025_ECON = "https://www.hebei.gov.cn/columns/3bbf017c-0e27-4cac-88c0-c5cac90ecd73/202604/14/39058c18-8d16-4a19-ab71-6d1bf8d2749f.html"
+_HB_2025_ZIPING = "http://wsjkw.hebei.gov.cn/czyjs/419541.jhtml"
+_SX_2024_URL = "https://wjw.shanxi.gov.cn/zfxxgk/fdzdgknr/ghjh/202602/P020260206603605483382.pdf"
+_NMG_2025_URL = "http://wjw.nmg.gov.cn/zfxxgk/fdzzgknr/tjxx/nb/202606/t20260612_2915713.html"
+_LN_2025_ECON = "https://tjj.ln.gov.cn/tjj/articleFileDir/2026-03/31/7d0ebeac0ed3499da6e4aa0f94acf972/2026033115100327617.pdf"
+_JL_2025_ECON = "http://tjj.jl.gov.cn/tjsj/tjgb/ndgb/202604/t20260427_3627028.html"
+_HLJ_2025_ECON = "https://tjj.hlj.gov.cn/tjj/c106779/202603/c00_31925539.shtml"
+_SH_2024_URL = "https://wsjkw.sh.gov.cn/2024wsjkzkbg/20251208/4fe2a4a9f0b54351984aa066777c05fb.html"
+_JS_2023_URL = "http://wjw.jiangsu.gov.cn/module/download/downfile.jsp?classid=0&filename=5bf41d52c7ac47b0a369b4b4d9285f3e.pdf"
+_ZJ_2025_ECON = "https://tjj.zj.gov.cn/col/col1229129205/art/2026/art_724c5ad52b8c4ac89def939cb9dee18c.html"
+_ZJ_2025_INST = "https://wsjkw.zj.gov.cn/col/col1229123426/art/2026/art_9d8eafccdf664d49833541f77a09b582.html"
+_ZJ_2024_PER1000 = "https://zjjcmspublic.oss-cn-hangzhou-zwynet-d01-a.internet.cloud.zj.gov.cn/jcms_files/jcms1/web2787/site/attach/0/975f8dccbdc04e96abd6f6e042a8ba7f.pdf"
+_AH_2024_URL = "https://wjw.ah.gov.cn/group4/M00/08/C2/wKg862kEeaaAQvaXAAjrongELhI404.pdf"
+_FJ_2022_URL = "https://wjw.fj.gov.cn/jggk/csxx/ghyxxc/xxtj_41288/202310/t20231023_6280147.htm"
+_FJ_2025_ECON = "https://tjj.fj.gov.cn/xxgk/tjgb/202603/t20260313_7109476.htm"
+_FJ_2024_PER1000 = "https://wjw.fujian.gov.cn/jggk/csxx/bgs/gzdt/202510/t20251013_7020368.htm"
+_JX_2025_ECON = "https://www.jiangxi.gov.cn/jxsrmzf/zxfb/pc/content/content_2037309510965067776.html"
+_SD_2024_URL = "http://wsjkw.shandong.gov.cn/zwgk/fdzdgknr/tjgb/202512/P020251217356715592186.pdf"
+_HA_2025_ECON = "https://tjj.henan.gov.cn/2026/04-09/3341308.html"
+_HUB_2025_ECON = "https://tjj.hubei.gov.cn/tjsj/tjgb/ndtjgb/qstjgb/202603/t20260318_5894639.shtml"
+_HUN_2024_URL = "https://wjw.hunan.gov.cn/wjw/xxgk/tzgg/202601/33901702/files/3c6a647af6ef4ba7ba53f62d8393455c.pdf"
+_GD_2025_URL = "https://wsjkw.gd.gov.cn/gkmlpt/content/4/4907/mpost_4907189.html"
+_GX_2024_URL = "https://wsjkw.gxzf.gov.cn/xxgk_49493/fdzdgk/tjxx/tjnb/t26240378.shtml"
+_HAIN_2023_URL = "https://wst.hainan.gov.cn/swjw/xxgk/0900/202411/t20241122_3773173.html"
+_CQ_2025_URL = "https://wsjkw.cq.gov.cn/zwgk_242/fdzdgknr/tjxx/tjfx/202608/W020260825529766743577.pdf"
+_SC_2024_URL = "https://wsjkw.sc.gov.cn/scwsjkw/njgb/2026/2/9/821f77b263a044498965f82e3b035625.shtml"
+_GZ_2023_URL = "https://wjw.guizhou.gov.cn/zwgk/zdlyxx/tjsj/202409/t20240925_85752730.html"
+_GZ_2025_TABLE = "https://wjw.guizhou.gov.cn/zwgk/zdlyxx/tjsj/202605/t20260519_90187411.html"
+_XZ_2025_URL = "https://wjw.xizang.gov.cn/zwgk/msggk/jktongji/202605/P020260514396224265562.pdf"
+_SNX_2025_URL = "https://sxwjw.shaanxi.gov.cn/zfxxgk/fdzdgknr/tjxx/P020260810289621239421.pdf"
+_GS_2023_URL = "http://wjw.pingliang.gov.cn/api-gateway/jpaas-web-server/front/document/download?fileUrl=YW5UzzlvCwcM%2FNHHX%2FtT6HhnILUYEuE4XKZMlTIXaXXVpClpPglLhXCuwXzLou4SJUsirtvM6eYjnzYfMi2On92on0msZ5Ku7PMC6I%2BajE%2Fb06LZoiascJajaQn%2BXuR8yYi%2BEU%2BpmXIAhW5B6qAk9Eg%2Bxgbnhm2Q19hYAdU%2BAg8%3D&fileName=2023%E5%B9%B4%E7%94%98%E8%82%83%E7%9C%81%E5%8D%AB%E7%94%9F%E5%81%A5%E5%BA%B7%E4%BA%8B%E4%B8%9A%E5%8F%91%E5%B1%95%E7%BB%9F%E8%AE%A1%E5%85%AC%E6%8A%A5.pdf"
+_QH_2025_ECON = "http://tjj.qinghai.gov.cn/tjData/yearBulletin/202603/P020260302663152872943.doc"
+_NX_2025_URL = "https://wsjkw.nx.gov.cn/zfxxgk_279/fdzdgknr/wstjbg/202606/t20260625_5274257.html"
+_XJ_2024_URL = "https://wjw.xinjiang.gov.cn/hfpc/xwxc1/202507/8084e94da5b44ca9a8a3dc5a6f1a9759.shtml"
+
 VERIFIED_RECORDS: tuple[ResourceRecord, ...] = (
     # National 2023, NHC 2023 statistical bulletin (PDF text extraction):
     # "2023年末，全国医疗卫生机构总数 1070785 个" / "全国医疗卫生机构床位
@@ -1356,8 +1393,8 @@ VERIFIED_RECORDS: tuple[ResourceRecord, ...] = (
         source_url=_GS_2023_URL,
         published=date(2024, 3, 1),
         notes=(
-            "Prose wording 医疗机构床位 (Table 5 titled 医疗卫生机构床位
-            数); OCR-extracted, internal arithmetic checked (188,994 + "
+            "Prose wording 医疗机构床位 (Table 5 titled 医疗卫生机构床位数); "
+            "OCR-extracted, internal arithmetic checked (188,994 + "
             "14,980 = 203,974); the 医院床位 subcategory EXCLUDES 妇幼保健院 "
             "beds (listed separately)."
         ),

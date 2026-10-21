@@ -280,23 +280,27 @@ def test_alignment_report_covers_all_episodes_and_frequencies():
 
 
 def test_verified_records_are_valid_and_cited():
-    assert len(VERIFIED_RECORDS) == 8
+    assert len(VERIFIED_RECORDS) == 91
     for record in VERIFIED_RECORDS:
         assert record.evidence_label == "external"
         assert record.source_url.startswith("http")
         assert record.metric in PROVINCIAL_METRICS
-        assert record.year == 2023
+        assert record.year in {2022, 2023, 2024, 2025}
 
 
 def test_verified_regions():
-    assert recorded_regions(VERIFIED_RECORDS) == ["Beijing", "Yunnan"]
+    # S20 full-data coverage: every provincial-level division is recorded
+    assert recorded_regions(VERIFIED_RECORDS) == sorted(PROVINCES)
+    assert len(recorded_regions(VERIFIED_RECORDS)) == 31
 
 
 def test_unrecorded_provinces_are_named():
-    unrecorded = unrecorded_provinces(VERIFIED_RECORDS)
-    assert len(unrecorded) == len(PROVINCES) - 2
-    assert "Guangdong" in unrecorded
-    assert "Yunnan" not in unrecorded
+    # the real registry now covers all 31 provinces
+    assert unrecorded_provinces(VERIFIED_RECORDS) == []
+    # named-missingness machinery still names every province when nothing
+    # is recorded (boundary case; real data never reaches this path now)
+    assert unrecorded_provinces(()) == list(PROVINCES)
+    assert len(unrecorded_provinces(())) == 31
 
 
 def test_province_vocabulary_is_31_and_unique():
@@ -360,12 +364,39 @@ def test_exposure_report_for_yunnan_episode():
 
 
 def test_exposure_report_for_unrecorded_region_is_named_missing():
+    # the real registry has no unrecorded region left (S20 full coverage),
+    # so the named-missingness path is exercised on an empty registry
     episode = synthetic_episode(region="Guangdong")
-    report = exposure_report(episode)
+    report = exposure_report(episode, records=())
     assert report.institutions is None
     assert report.beds is None
     assert report.record_year is None
     assert report.record_sources == ()
+
+
+def test_exposure_report_full_coverage_years():
+    # every province returns a report whose record_year is one of the
+    # verified record years; landmark figures spot-checked against the
+    # S20 province-expansion records
+    landmarks = {
+        "Tibet": (7_436, 22_154, 2025),
+        "Shaanxi": (35_131, 301_183, 2025),
+        "Fujian": (31_000, 254_000, 2025),
+        "Zhejiang": (40_343, 421_000, 2025),
+        "Guizhou": (31_581, 302_334, 2025),
+        "Xinjiang": (16_739, 177_700, 2024),
+        # Jilin's latest source reports beds only - institutions named missing
+        "Jilin": (None, 180_900, 2025),
+    }
+    for province in PROVINCES:
+        report = exposure_report(synthetic_episode(region=province))
+        assert report.record_year in {2022, 2023, 2024, 2025}
+        assert report.record_sources
+        if province in landmarks:
+            inst, beds, year = landmarks[province]
+            assert report.institutions == inst, province
+            assert report.beds == beds, province
+            assert report.record_year == year, province
 
 
 def test_exposure_uses_latest_verified_year():
