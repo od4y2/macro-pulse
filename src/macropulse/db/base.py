@@ -20,13 +20,26 @@ DEFAULT_DATABASE_URL = (
 
 
 def database_url() -> str:
-    return os.environ.get("NEON_DATABASE_URL", DEFAULT_DATABASE_URL)
+    """Resolve the connection string: ``NEON_DATABASE_URL`` (managed-DB
+    ops runs) wins, then ``DATABASE_URL`` (what the cloud secrets bridge
+    and alembic use), then the local docker default."""
+    return (
+        os.environ.get("NEON_DATABASE_URL")
+        or os.environ.get("DATABASE_URL")
+        or DEFAULT_DATABASE_URL
+    )
 
 
 def make_engine(url: str | None = None) -> Engine:
     """Create an engine; pooling is left to defaults so managed providers
-    can inject their own pooler via the URL parameters."""
-    return create_engine(url or database_url(), future=True)
+    can inject their own pooler via the URL parameters.
+
+    ``pool_pre_ping``: managed providers such as Neon suspend idle
+    computes, which silently kills pooled connections; a pre-ping
+    recycles a dead connection instead of surfacing an operational
+    error to the next request.
+    """
+    return create_engine(url or database_url(), future=True, pool_pre_ping=True)
 
 
 def make_session_factory(engine: Engine):

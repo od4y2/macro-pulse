@@ -20,6 +20,11 @@ Requires the query service to be running:
     PYTHONPATH=src .venv/bin/python -m uvicorn macropulse.api.main:app --port 8000
 
 (or set ``MACROPULSE_API_URL`` to point elsewhere).
+
+Single-process hosts (Streamlit Community Cloud): the service runs on
+an in-process thread instead of a standalone uvicorn - see
+``macropulse.cloud_runtime``. When that module is absent, the
+standalone service above is expected to be running.
 """
 
 from __future__ import annotations
@@ -28,6 +33,13 @@ from datetime import UTC, date, datetime
 
 import plotly.graph_objects as go
 import streamlit as st
+
+try:
+    from macropulse.cloud_runtime import boot
+except ImportError:
+    pass  # not a cloud deployment: the standalone service is expected
+else:
+    boot()
 
 from macropulse.case_study.macro_episodes import MACRO_EPISODES
 from macropulse.catalog import CATALOG
