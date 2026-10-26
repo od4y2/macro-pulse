@@ -12,6 +12,11 @@ merit rankings are banned patterns (a closed, named vocabulary). The
 rendered document is itself run through this check in tests and in the
 live demo.
 
+``check_numeric_fidelity`` is the number-level rejection layer for
+non-template prose (the LLM path): every numeric token in the text must
+decimal-equal a token in the validated claims, so a fabricated number
+can never reach the rendered document.
+
 The closing boundary line of the document cites the code-level
 ``NON_CLAIMS`` constant from ``macropulse.scope`` - a standing scope
 statement, not a data claim.
@@ -20,6 +25,8 @@ statement, not a data claim.
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
+from decimal import Decimal, InvalidOperation
 
 from macropulse.briefing.claims import Adjudication, Claim
 from macropulse.briefing.facts import BriefingFacts
@@ -57,6 +64,100 @@ def check_prose(text: str) -> list[str]:
     ]
 
 
+# Numeric fidelity guard: a number token is a run of digits (optionally
+# comma-grouped, optionally with a decimal fraction). ISO dates tokenize
+# into their components ("2025-01-01" -> 2025, 01, 01), which is exactly
+# what we want - dates in prose must match dates in the claims too.
+NUMBER_TOKEN = re.compile(r"\d[\d,]*(?:\.\d+)?")
+
+
+def _number_pairs(text: str) -> list[tuple[str, Decimal]]:
+    """Numeric tokens of ``text`` as (raw, value) pairs, in order."""
+    pairs: list[tuple[str, Decimal]] = []
+    for raw in NUMBER_TOKEN.findall(text):
+        try:
+            pairs.append((raw, Decimal(raw.replace(",", ""))))
+        except InvalidOperation:  # defensive: malformed comma grouping
+            continue
+    return pairs
+
+
+def numeric_tokens(text: str) -> set[Decimal]:
+    """Distinct numeric values appearing in ``text`` (commas stripped)."""
+    return {value for _, value in _number_pairs(text)}
+
+
+def check_numeric_fidelity(text: str, validated_claims: Sequence[Claim]) -> list[str]:
+    """Raw numeric tokens in ``text`` not backed by the validated claims.
+
+    Every number in the prose must decimal-equal some number in the
+    validated claim texts ("2.90" passes against a claim stating 2.9;
+    date components pass because ISO dates appear in claim text). A
+    non-empty result means the prose fabricated numbers - the caller
+    must not render it. Empty claim list: every number is a violation.
+    """
+    allowed: set[Decimal] = set()
+    for claim in validated_claims:
+        allowed |= numeric_tokens(claim.text)
+    violations: list[str] = []
+    seen: set[Decimal] = set()
+    for raw, value in _number_pairs(text):
+        if value in allowed or value in seen:
+            continue
+        violations.append(raw)
+        seen.add(value)
+    return violations
+
+
+DOCUMENT_TITLE = "MacroPulse structured briefing"
+
+
+def scope_line(facts: BriefingFacts) -> str:
+    """The deterministic scope statement (counts come from the facts)."""
+    economies = sorted({f.country_iso3 for f in facts.facts})
+    indicators = sorted({f.indicator_id for f in facts.facts})
+    return (
+        f"Scope: {len(economies)} economies, {len(indicators)} indicator(s), "
+        f"{len(facts.facts)} validated observations (evidence: real). "
+        f"{len(facts.excluded)} observation(s) excluded - not real evidence, "
+        f"never stated as observed; {len(facts.missing)} recorded missing."
+    )
+
+
+def limitation_lines(
+    facts: BriefingFacts,
+    rejected: list[tuple[Claim, Adjudication]],
+) -> list[str]:
+    """The deterministic Limitations section body.
+
+    Worded to contain none of the banned literals: the document must
+    pass its own check_prose gate mechanically, with no exemption for
+    good intentions - a disclaimer that used the banned phrases would
+    be indistinguishable, to the check, from prose committing them.
+    """
+    lines: list[str] = []
+    if facts.excluded:
+        labels = sorted({e.evidence_label for e in facts.excluded})
+        lines.append(
+            f"- {len(facts.excluded)} observation(s) excluded (evidence "
+            f"labels: {', '.join(labels)}) - not stated as observed."
+        )
+    if rejected:
+        reasons = sorted({a.reason for _, a in rejected if a.reason})
+        lines.append(
+            f"- {len(rejected)} candidate claim(s) rejected during validation "
+            f"(reasons: {', '.join(reasons)}); rejected text is not shown as "
+            "statements."
+        )
+    lines.append(
+        "- This briefing states observed values with citations only; it "
+        "makes no causal statements, no rankings of merit, no "
+        "forward-looking statements, and no financial guidance (see "
+        "macropulse.scope.NON_CLAIMS)."
+    )
+    return lines
+
+
 def render_briefing(
     facts: BriefingFacts,
     adjudicated: list[tuple[Claim, Adjudication]],
@@ -69,19 +170,11 @@ def render_briefing(
     validated = [(c, a) for c, a in adjudicated if a.validated]
     rejected = [(c, a) for c, a in adjudicated if not a.validated]
 
-    economies = sorted({f.country_iso3 for f in facts.facts})
-    indicators = sorted({f.indicator_id for f in facts.facts})
-
     lines: list[str] = []
-    lines.append("MacroPulse structured briefing")
+    lines.append(DOCUMENT_TITLE)
     lines.append("=============================")
     lines.append("")
-    lines.append(
-        f"Scope: {len(economies)} economies, {len(indicators)} indicator(s), "
-        f"{len(facts.facts)} validated observations (evidence: real). "
-        f"{len(facts.excluded)} observation(s) excluded - not real evidence, "
-        f"never stated as observed; {len(facts.missing)} recorded missing."
-    )
+    lines.append(scope_line(facts))
     lines.append("")
 
     lines.append("Statements")
@@ -104,29 +197,7 @@ def render_briefing(
 
     lines.append("Limitations")
     lines.append("-----------")
-    if facts.excluded:
-        labels = sorted({e.evidence_label for e in facts.excluded})
-        lines.append(
-            f"- {len(facts.excluded)} observation(s) excluded (evidence "
-            f"labels: {', '.join(labels)}) - not stated as observed."
-        )
-    if rejected:
-        reasons = sorted({a.reason for _, a in rejected if a.reason})
-        lines.append(
-            f"- {len(rejected)} candidate claim(s) rejected during validation "
-            f"(reasons: {', '.join(reasons)}); rejected text is not shown as "
-            "statements."
-        )
-    # Worded to contain none of the banned literals: the document must
-    # pass its own check_prose gate mechanically, with no exemption for
-    # good intentions - a disclaimer that used the banned phrases would
-    # be indistinguishable, to the check, from prose committing them.
-    lines.append(
-        "- This briefing states observed values with citations only; it "
-        "makes no causal statements, no rankings of merit, no "
-        "forward-looking statements, and no financial guidance (see "
-        "macropulse.scope.NON_CLAIMS)."
-    )
+    lines.extend(limitation_lines(facts, rejected))
     return "\n".join(lines)
 
 

@@ -76,18 +76,57 @@ class MetricOut(BaseModel):
     version: str
 
 
+class FactRefOut(BaseModel):
+    """One cited observation's identity - the wire shape of FactRef.
+
+    The persisted ``briefing_claims.evidence_refs`` are FactRef dumps
+    (the S03 observation identity), not integer observation ids, so the
+    claim schema mirrors the 6-field reference exactly.
+    """
+
+    indicator_id: str
+    country_iso3: str
+    period: str
+    vintage: str
+    source_system: str
+    source_code: str
+
+
 class BriefingClaimOut(BaseModel):
     claim_text: str
-    evidence_refs: list[int]
+    evidence_refs: list[FactRefOut]
     validated: bool
 
 
 class BriefingOut(BaseModel):
+    """One persisted briefing run (GET /briefing/{run_id}).
+
+    The prose itself is not persisted - ``briefing_runs`` records the
+    generator identity, status, and adjudicated claims (the audit trail);
+    the document is re-renderable from those inputs.
+    """
+
+    id: int
     created_at: datetime
     model: str
     prompt_version: str
     status: str
     claims: list[BriefingClaimOut]
+
+
+class BriefingGenerateRequest(BaseModel):
+    # Length-pinned so a malformed code is an automatic 422, never a
+    # silent no-match; existence is checked against the Country table.
+    country_iso3: str = Field(min_length=3, max_length=3)
+
+
+class BriefingGenerateOut(BriefingOut):
+    """POST /briefing: the generated document plus its honest provenance."""
+
+    country_iso3: str
+    prose: str
+    used_llm: bool
+    warning: str | None = None
 
 
 class HealthOut(BaseModel):

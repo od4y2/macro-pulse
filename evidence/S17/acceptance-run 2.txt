@@ -1,0 +1,26 @@
+=== S17 acceptance run — 2026-09-10T06:43:29Z ===
+
+--- git HEAD ---
+63d867f S16: Structured AI Briefing
+
+--- 1. full test suite ---
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+497 passed, 1 warning in 10.44s
+
+--- 2. query service smoke ---
+MacroPulse query service smoke test passed: {'status': 'ok', 'data_mode': 'database'}
+
+--- 3. ruff check (S17-touched files) ---
+All checks passed!
+
+--- 4. S13 pin: api/schemas.py byte-identical to 63d867f ---
+0 diff lines (expect 0)
+
+--- 5. alembic head on dev DB ---
+c9af6b543047 (head)
+
+--- 6. live demo (evidence/S17/live-demo-output.txt) ---
+-> exit code 1
+-> exit code 0
+-> exit code 1
+   DEMO PASSED

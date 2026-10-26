@@ -10,10 +10,12 @@ schemas, served from inside its own process.
 Host-specific facts are handled here and nowhere else:
 
 1. Secrets-TOML values land in ``st.secrets`` and NEVER in
-   ``os.environ`` - but ``database_url()`` reads ``os.environ``. The
-   Neon URL is bridged into the environment BEFORE the service module
-   import (``create_app`` reads DATABASE_URL at import time;
-   connections stay lazy). The value is never printed or logged.
+   ``os.environ`` - but ``database_url()`` reads ``os.environ``, and so
+   does the briefing layer's call-time ``LLMSettings.from_env()``. The
+   Neon URL and the ``LLM_*`` keys are bridged into the environment
+   BEFORE the service module import (``create_app`` reads DATABASE_URL
+   at import time; connections stay lazy). Values are never printed or
+   logged. An explicit environment variable always wins over a secret.
 2. Neon connection strings use the bare ``postgresql://`` scheme
    (libpq naming); SQLAlchemy needs the psycopg3 driver named
    explicitly, so the scheme is normalized to
@@ -73,31 +75,67 @@ def _normalize_scheme(url: str) -> str:
     return url
 
 
-def _bridge_secrets() -> None:
-    """Map the Neon URL from ``st.secrets`` into ``os.environ``.
+# LLM configuration the briefing layer reads from os.environ at call
+# time (briefing/llm.py, D3): bridged from st.secrets on cloud hosts,
+# where secrets never reach the environment on their own.
+BRIDGED_LLM_KEYS = (
+    "LLM_PROVIDER",
+    "LLM_BASE_URL",
+    "LLM_MODEL",
+    "LLM_API_KEY",
+    "LLM_EXTRA_BODY",
+)
 
-    Accepts ``DATABASE_URL`` or ``NEON_DATABASE_URL`` (the ``.env.local``
-    name). No-op when the environment already carries a ``DATABASE_URL``
-    or when no secrets source is available (bare runs, tests).
+
+def _bridge_key(secrets: object, key: str) -> bool:
+    """Copy one secret verbatim into ``os.environ``; report whether it landed.
+
+    An explicit environment value always wins (local runs and tests are
+    unaffected). A missing key - or no secrets file at all
+    (``StreamlitSecretNotFoundError``) - is a silent skip: there is
+    simply nothing to bridge. The VALUE is never logged.
     """
-    if os.environ.get("DATABASE_URL"):
-        return
-    import streamlit as st
-
+    if os.environ.get(key):
+        return False  # env-explicit wins
     try:
+        value = secrets[key]  # type: ignore[index]
+    except Exception:  # noqa: BLE001 - any failure means "not there"
+        return False
+    os.environ[key] = str(value)
+    return True
+
+
+def _bridge_secrets() -> None:
+    """Map the Neon URL and the ``LLM_*`` keys from ``st.secrets``.
+
+    The database URL accepts ``DATABASE_URL`` or ``NEON_DATABASE_URL``
+    (the ``.env.local`` name) and is scheme-normalized for psycopg3. An
+    environment that already carries ``DATABASE_URL`` skips only the DB
+    bridge - the LLM keys are still considered (they have their own
+    env-explicit guard). No-op when no secrets source is available
+    (bare runs, tests).
+    """
+    try:
+        import streamlit as st
+
         secrets = st.secrets
     except Exception:  # noqa: BLE001 - any failure shape means "no secrets"
         return  # no secrets file configured - nothing to bridge
-    for key in ("DATABASE_URL", "NEON_DATABASE_URL"):
-        try:
-            url = secrets[key]
-        except Exception:  # noqa: BLE001, S112 - see below; nothing to bridge
-            # KeyError for a missing key, StreamlitSecretNotFoundError
-            # when no secrets file exists at all (bare local runs) -
-            # either way there is nothing to bridge for this key.
-            continue
-        os.environ["DATABASE_URL"] = _normalize_scheme(str(url))
-        return
+
+    if not os.environ.get("DATABASE_URL"):
+        # Accept either name; NEON_DATABASE_URL lands under DATABASE_URL.
+        for source_key in ("DATABASE_URL", "NEON_DATABASE_URL"):
+            try:
+                url = secrets[source_key]  # type: ignore[index]
+            except Exception:  # noqa: BLE001, S112 - nothing to bridge
+                # KeyError for a missing key, StreamlitSecretNotFoundError
+                # when no secrets file exists at all (bare local runs) -
+                # either way there is nothing to bridge for this name.
+                continue
+            os.environ["DATABASE_URL"] = _normalize_scheme(str(url))
+            break
+    for key in BRIDGED_LLM_KEYS:
+        _bridge_key(secrets, key)
 
 
 def _service_url(port: int) -> str:

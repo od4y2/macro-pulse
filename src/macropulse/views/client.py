@@ -17,6 +17,11 @@ DEFAULT_PAGE_SIZE = 500
 DEFAULT_BASE_URL = "http://127.0.0.1:8000"
 REQUEST_TIMEOUT = 30.0
 
+# Nested timeout budget (plan D11): the service's LLM call fails at 45 s
+# and renders the deterministic fallback inside the request, so the
+# client must wait longer than that - never abort before the fallback.
+BRIEFING_TIMEOUT = 75.0
+
 _LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
 
 
@@ -61,8 +66,16 @@ class QueryServiceClient:
 
         return cls(os.environ.get("MACROPULSE_API_URL", DEFAULT_BASE_URL), **kwargs)
 
-    def _request(self, path: str, params: dict[str, str]) -> httpx.Response:
-        """One GET; transport failures and non-200s become QueryServiceError."""
+    def _request(
+        self,
+        method: str,
+        path: str,
+        *,
+        params: dict[str, str] | None = None,
+        json: dict[str, Any] | None = None,
+        timeout: float | None = None,
+    ) -> httpx.Response:
+        """One request; transport failures and non-200s become QueryServiceError."""
         # Loopback calls must never be routed through a proxy: with
         # trust_env, httpx picks up OS-level proxy settings (on macOS the
         # system-wide proxy, e.g. a local Clash-style listener), which
@@ -71,23 +84,26 @@ class QueryServiceClient:
         # environment-driven behavior.
         with httpx.Client(
             transport=self._transport,
-            timeout=self._timeout,
+            timeout=self._timeout if timeout is None else timeout,
             trust_env=not _is_loopback(self._base_url),
         ) as client:
             try:
-                response = client.get(f"{self._base_url}{path}", params=params)
+                response = client.request(
+                    method, f"{self._base_url}{path}", params=params, json=json
+                )
             except httpx.HTTPError as exc:
                 raise QueryServiceError(
                     f"query service unreachable at {self._base_url}: {exc}"
                 ) from exc
         if response.status_code != 200:
             raise QueryServiceError(
-                f"GET {path} -> HTTP {response.status_code}: {response.text[:200]}"
+                f"{method} {path} -> HTTP {response.status_code}: "
+                f"{response.text[:200]}"
             )
         return response
 
     def _get(self, path: str, params: dict[str, str]) -> Any:
-        return self._request(path, params).json()
+        return self._request("GET", path, params=params).json()
 
     def _get_all(self, path: str, params: dict[str, str]) -> list[dict]:
         """GET every page of a list endpoint.
@@ -100,7 +116,13 @@ class QueryServiceClient:
         offset = 0
         while True:
             response = self._request(
-                path, {**params, "limit": str(self._page_size), "offset": str(offset)}
+                "GET",
+                path,
+                params={
+                    **params,
+                    "limit": str(self._page_size),
+                    "offset": str(offset),
+                },
             )
             page = response.json()
             rows.extend(page)
@@ -183,3 +205,22 @@ class QueryServiceClient:
         if period_end is not None:
             params["period_end"] = period_end
         return self._get_all("/metrics", params)
+
+    def generate_briefing(self, country_iso3: str) -> dict:
+        """POST /briefing: one on-demand generation for one country.
+
+        Never cached by the caller's conventions - every call is one real
+        generation and one appended ``briefing_runs`` row. The longer
+        timeout spans the service-side LLM call; a service-side LLM
+        failure still answers 200 with ``status="fallback"``.
+        """
+        return self._request(
+            "POST",
+            "/briefing",
+            json={"country_iso3": country_iso3},
+            timeout=BRIEFING_TIMEOUT,
+        ).json()
+
+    def briefing_run(self, run_id: int) -> dict:
+        """GET /briefing/{run_id}: the persisted audit record of one run."""
+        return self._get(f"/briefing/{run_id}", {})

@@ -21,11 +21,16 @@ Interactive docs at `/docs` (FastAPI auto-generated).
 | `src/macropulse/api/deps.py` | per-request DB session dependency (`get_session`, `DbSession`) |
 | `src/macropulse/api/routes.py` | data endpoints |
 | `src/macropulse/api/methodology.py` | methodology endpoints |
+| `src/macropulse/api/briefing.py` | briefing generation + audit-read endpoints |
 | `src/macropulse/api/schemas.py` | S03-pinned response shapes (unchanged) |
 
 The session factory is injected at `create_app(session_factory=...)` and
 stored on `app.state`; tests bind the service to the dedicated test
-database through `app.dependency_overrides[get_session]`.
+database through `app.dependency_overrides[get_session]`. The briefing
+endpoints additionally accept an injectable LLM prose source via
+`create_app(llm_source_factory=...)` (tests supply a fake; production
+builds `HttpLlmSource` from the environment at call time — see
+docs/AIBriefing.md).
 
 ## Pagination (all list endpoints)
 
@@ -86,6 +91,52 @@ resolves to.
 Definitions actually recorded in `metric_versions` for that key, newest
 version first — the per-metric audit trail. `404` when the key has no
 recorded definitions (an unknown key must not read as "no methodology").
+
+### `POST /briefing`
+Generate a structured briefing for **one country** on demand (S16
+pipeline + LLM prose source; see docs/AIBriefing.md). Request body:
+
+```json
+{"country_iso3": "USA"}
+```
+
+- `422` when the iso3 is not exactly 3 characters (schema validation) or
+  when the facts contract rejects the rows (e.g. duplicate latest
+  vintages) — the contract failure is loud, never silently deduped
+- `404` when the country is unknown to the panel
+
+The endpoint reads the country's latest-vintage observations, commits
+the read transaction **before** any LLM call (the session is not held
+across it), builds/adjudicates claims, and either serves the LLM draft
+(only after it passes every gate) or the deterministic template. It
+**always returns `200` with a document** once the country exists —
+LLM failure is not an HTTP error; it is a fallback:
+
+```json
+{
+  "id": 12, "created_at": "...", "model": "gpt-...", "prompt_version": "llm-v1",
+  "status": "completed", "claims": [{"claim_text": "...", "evidence_refs": [...], "validated": true}],
+  "country_iso3": "USA", "prose": "MacroPulse structured briefing\n...",
+  "used_llm": true, "warning": null
+}
+```
+
+On fallback: `status="fallback"`, `model="deterministic-template"`,
+`prompt_version="s16-v1"`, `used_llm=false`, and `warning` names the
+reason from the closed vocabulary (`llm_not_configured`,
+`llm_transport_error`, `llm_response_error`, `banned_phrase`,
+`fabricated_number`, `empty_llm_prose`, `no_validated_statements`).
+Every attempt appends a `briefing_runs` row (append-only audit); the
+response `id` is that row. `evidence_refs` are full fact references
+(indicator, country, period, vintage, source system/code) — provenance
+travels with the prose too.
+
+### `GET /briefing/{run_id}`
+Read a persisted run back: `{id, created_at, model, prompt_version,
+status, claims[]}` — the audit record (claims with validated flags and
+evidence refs). The generated `prose` is **not persisted**, so it is
+not served here; it exists only in the POST response. `404` for an
+unknown run id.
 
 ## Conventions carried from the governance contract
 

@@ -1,0 +1,15 @@
+S19 rendered-document QA run
+=============================
+document: docs/ResearchReport.md
+typeset formulas expected: 14
+cited repository paths: 52
+
+checks (each empty = pass):
+  formula presentation : PASS
+  citations resolvable : PASS
+  required sections    : PASS
+  banned phrases       : PASS
+  typeset registry     : PASS
+
+aggregate: PASS
+exit status: PASS

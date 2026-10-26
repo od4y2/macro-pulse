@@ -20,7 +20,12 @@ from macropulse.views.assembly import (
     coverage_counts,
     provenance_rows,
 )
-from macropulse.views.client import QueryServiceClient, QueryServiceError
+from macropulse.views.client import (
+    BRIEFING_TIMEOUT,
+    REQUEST_TIMEOUT,
+    QueryServiceClient,
+    QueryServiceError,
+)
 
 # --- client -------------------------------------------------------------------
 
@@ -136,6 +141,50 @@ def test_client_health_decodes_payload() -> None:
 
     client = QueryServiceClient("http://test", transport=httpx.MockTransport(handler))
     assert client.health() == {"status": "ok", "data_mode": "database"}
+
+
+# --- briefing endpoints ---------------------------------------------------------
+
+
+def test_client_generate_briefing_posts_json_body() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.method == "POST"
+        assert request.url.path == "/briefing"
+        assert json.loads(request.content) == {"country_iso3": "USA"}
+        # Nested timeout budget: the client outwaits the service's LLM call.
+        assert request.extensions["timeout"]["read"] == BRIEFING_TIMEOUT
+        return httpx.Response(200, json={"id": 1, "status": "completed"})
+
+    client = QueryServiceClient("http://test", transport=httpx.MockTransport(handler))
+    assert client.generate_briefing("USA") == {"id": 1, "status": "completed"}
+
+
+def test_client_generate_briefing_error_mentions_post() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(500, text="boom")
+
+    client = QueryServiceClient("http://test", transport=httpx.MockTransport(handler))
+    with pytest.raises(QueryServiceError, match=r"POST /briefing -> HTTP 500"):
+        client.generate_briefing("USA")
+
+
+def test_client_briefing_run_gets_path() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.method == "GET"
+        assert request.url.path == "/briefing/7"
+        return httpx.Response(200, json={"id": 7, "status": "fallback"})
+
+    client = QueryServiceClient("http://test", transport=httpx.MockTransport(handler))
+    assert client.briefing_run(7) == {"id": 7, "status": "fallback"}
+
+
+def test_client_briefing_timeout_nesting_holds() -> None:
+    # D11 invariant: LLM 45 s < client briefing timeout; ordinary GETs
+    # keep the short default.
+    from macropulse.briefing import LLM_TIMEOUT_SECONDS
+
+    assert LLM_TIMEOUT_SECONDS < BRIEFING_TIMEOUT
+    assert REQUEST_TIMEOUT < BRIEFING_TIMEOUT
 
 
 # --- assembly: fixtures -------------------------------------------------------

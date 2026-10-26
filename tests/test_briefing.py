@@ -6,6 +6,8 @@ All inputs are synthetic fixtures (test payloads, never observations).
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 import pytest
 
 from macropulse.briefing import (
@@ -15,7 +17,9 @@ from macropulse.briefing import (
     adjudicate,
     adjudicate_all,
     build_claims,
+    check_numeric_fidelity,
     check_prose,
+    numeric_tokens,
     record_briefing_run,
     render_briefing,
     render_rejection_report,
@@ -463,3 +467,83 @@ def test_record_briefing_run_rejects_overlong_identity(session) -> None:
         record_briefing_run(
             session, model="ok", prompt_version="x" * 33, adjudicated=[]
         )
+
+
+def test_record_briefing_run_records_fallback_status(session) -> None:
+    from macropulse.db.models import BriefingRun
+
+    run_id = record_briefing_run(
+        session,
+        model=DETERMINISTIC_MODEL,
+        prompt_version=DETERMINISTIC_PROMPT_VERSION,
+        adjudicated=[],
+        status="fallback",
+    )
+    run = session.get(BriefingRun, run_id)
+    assert run is not None
+    assert run.status == "fallback"
+
+
+def test_record_briefing_run_rejects_unknown_status(session) -> None:
+    with pytest.raises(ValueError, match="outside"):
+        record_briefing_run(
+            session,
+            model=DETERMINISTIC_MODEL,
+            prompt_version=DETERMINISTIC_PROMPT_VERSION,
+            adjudicated=[],
+            status="partially-fine",
+        )
+
+
+# --- numeric fidelity guard --------------------------------------------------------
+
+
+def _validated_3y() -> list:
+    facts = facts_3y()
+    adjudicated = adjudicate_all(build_claims(facts), facts)
+    return [c for c, a in adjudicated if a.validated]
+
+
+def test_numeric_tokens_parses_values_and_dates() -> None:
+    tokens = numeric_tokens("2.9 percent_per_year in 2025-01-01 (1,234.5 units)")
+    assert tokens == {Decimal("2.9"), Decimal(2025), Decimal(1), Decimal("1234.5")}
+
+
+def test_check_numeric_fidelity_passes_claim_numbers() -> None:
+    # Exact values, ISO dates, and decimal-equivalent restatements all
+    # pass ("2.90" == the claim's 2.9). Only numbers the validated
+    # claims carry are admissible - 2023 appears in the facts but in no
+    # validated claim, so it stays out of admissible prose.
+    prose = (
+        "Real GDP growth for BRA stood at 2.90 percent_per_year in "
+        "2025-01-01, up from 2.8 in 2024-01-01."
+    )
+    assert check_numeric_fidelity(prose, _validated_3y()) == []
+    assert check_numeric_fidelity("Also noted for 2023.", _validated_3y()) == [
+        "2023"
+    ]
+
+
+def test_check_numeric_fidelity_flags_fabricated_number() -> None:
+    prose = "Real GDP growth for BRA stood at 2.9, with inflation at 3.5 percent."
+    violations = check_numeric_fidelity(prose, _validated_3y())
+    assert violations == ["3.5"]
+
+
+def test_check_numeric_fidelity_comma_grouping_matches() -> None:
+    facts = BriefingFacts.from_observations([obs(value=1234.5)])
+    validated = [
+        c
+        for c, a in adjudicate_all(build_claims(facts), facts)
+        if a.validated
+    ]
+    assert check_numeric_fidelity("The level was 1,234.5 units.", validated) == []
+
+
+def test_check_numeric_fidelity_no_claims_flags_every_number() -> None:
+    assert check_numeric_fidelity("Growth was 7 percent.", []) == ["7"]
+
+
+def test_check_numeric_fidelity_dedupes_repeated_fabrication() -> None:
+    prose = "A 3.5 figure and again 3.5 and yet 9.9."
+    assert check_numeric_fidelity(prose, _validated_3y()) == ["3.5", "9.9"]

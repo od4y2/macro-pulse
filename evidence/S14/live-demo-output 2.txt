@@ -1,0 +1,38 @@
+
+=== boot the dashboard (default view) ===
+exceptions: 0
+title: MacroPulse
+claims caption: Observed macroeconomic data with full provenance. No forecasts, no causal claims, no investment advice. Every row carries its evidence label, vintage, and source; missing values are named, never imputed.
+tabs: ['Country view', 'Comparison view', 'Provenance view']
+
+=== country view: USA, all provenance columns, real WB values ===
+columns: ['indicator_id', 'period', 'value', 'unit', 'frequency', 'vintage', 'evidence_label', 'quality_grade', 'source', 'source_role', 'release_time', 'retrieval_time', 'missing_reason']
+      indicator_id      period              value              unit frequency     vintage evidence_label quality_grade                          source source_role          release_time        retrieval_time missing_reason
+0  gdp_real_growth  2015-01-01  -3.54576339269425  percent_per_year    annual  2026-09-01           real      ungraded  world_bank · NY.GDP.MKTP.KD.ZG     primary  2026-09-01T00:00:00Z  2026-09-01T00:00:00Z               
+1  gdp_real_growth  2016-01-01  -3.27591690782192  percent_per_year    annual  2026-09-01           real      ungraded  world_bank · NY.GDP.MKTP.KD.ZG     primary  2026-09-01T00:00:00Z  2026-09-01T00:00:00Z               
+2  gdp_real_growth  2017-01-01   1.32286905404399  percent_per_year    annual  2026-09-01           real      ungraded  world_bank · NY.GDP.MKTP.KD.ZG     primary  2026-09-01T00:00:00Z  2026-09-01T00:00:00Z               
+
+=== comparison view: 10-economy matrix + coverage counts ===
+matrix shape: (11, 11)
+       period                BRA               CHN               DEU               GBR               IND                JPN               KOR               MEX               USA                ZAF
+0  2015-01-01  -3.54576339269425  6.98162255562367  1.66300602334775  2.14040560033371  7.99625378567987   1.79997735783475  2.92029267301234  2.70232343024026  2.94555045227337   1.32186223678229
+1  2016-01-01  -3.27591690782192   6.7736886867727  2.22222216259371  2.20652020635357  8.25630550176662  0.704986495111257  3.17152748983935   1.7724932254128  1.81945147909089  0.664552307858116
+2  2017-01-01   1.32286905404399  6.89123916636191    2.797906720551  3.02322219840339  6.79538341902422   1.62345062245441    3.433191763972  1.87172854648381  2.45762230126449   1.15794695181735
+coverage: [{'country': 'BRA', 'observed': 11, 'missing': 0, 'total_periods': 11, 'first_observed': '2015-01-01', 'last_observed': '2025-01-01'}, {'country': 'CHN', 'observed': 11, 'missing': 0, 'total_periods': 11, 'first_observed': '2015-01-01', 'last_observed': '2025-01-01'}] ...
+
+=== provenance view: full vintage chain ===
+shape: (11, 10)
+       period     vintage              value  is_latest_vintage quality_grade evidence_label                          source          release_time        retrieval_time missing_reason
+0  2015-01-01  2026-09-01  -3.54576339269425               True      ungraded           real  world_bank · NY.GDP.MKTP.KD.ZG  2026-09-01T00:00:00Z  2026-09-01T00:00:00Z               
+1  2016-01-01  2026-09-01  -3.27591690782192               True      ungraded           real  world_bank · NY.GDP.MKTP.KD.ZG  2026-09-01T00:00:00Z  2026-09-01T00:00:00Z               
+metrics: [('Rows (all vintages)', '11'), ('Periods with >1 vintage', '0')]
+
+=== view switch: provenance -> CHN, comparison -> ZAF only ===
+provenance CHN rows: 11
+comparison ZAF matrix rows: 11
+comparison ZAF coverage: [{'country': 'ZAF', 'observed': 11, 'missing': 0, 'total_periods': 11, 'first_observed': '2015-01-01', 'last_observed': '2025-01-01'}]
+
+=== empty state: no indicators selected ===
+info: ['Select at least one indicator.']
+
+=== demo complete - all views render real data with provenance ===

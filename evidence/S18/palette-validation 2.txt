@@ -1,0 +1,32 @@
+# MacroPulse categorical palette validation (unit S18)
+
+Command: node scripts/validate_palette.js \
+  "#9d2244,#0e95a6,#a5760d,#7a4a9e,#c05a2e,#3a66c4,#a0447c,#4c8a4f,#b8912a,#17a6b3" \
+  --mode light --surface "#fdfdfc"
+
+Run: 2026-09-24T08:02:03Z
+
+Hue assignment (S01 panel order from src/macropulse/scope.py):
+  USA #9d2244 claret | CHN #0e95a6 teal | JPN #a5760d ochre | DEU #7a4a9e plum
+  GBR #c05a2e terracotta | IND #3a66c4 blue | BRA #a0447c magenta | KOR #4c8a4f green
+  ZAF #b8912a amber | MEX #17a6b3 teal-light
+
+
+Palette (light, surface #fdfdfc, categorical): 10 slots
+  [PASS] Lightness band         all 10 inside L 0.43–0.77
+  [PASS] Chroma floor           all 10 >= 0.1
+  [WARN] CVD separation         worst adjacent #b8912a↔#4c8a4f ΔE 7.7 (protan) · tritan 12.7
+  [PASS] Normal-vision floor    worst adjacent #b8912a↔#4c8a4f ΔE 15.2 (normal)
+  [WARN] Contrast vs surface    below 3:1 — relief required (visible labels or table view): [["#b8912a",2.9],["#17a6b3",2.89]]
+
+  → ALL CHECKS PASS  (CVD in the 6–8 floor band is legal ONLY with secondary encoding: direct labels, gaps, or texture)
+  scope: categorical palettes only. For a lone status/text color check WCAG text contrast; for a sequential ramp, lightness monotonicity.
+
+
+WARN disposition (relief rule, see src/macropulse/views/theme.py):
+- protan 7.7 green<->amber and sub-3:1 amber/teal-light are floor-band
+  WARNs, legal because every chart ships secondary encoding (direct
+  label/legend + the comparison matrix table) and at most ONE colored
+  line renders at a time (focus-and-context display).
+- Iteration history: darker amber was tried and made green<->amber WORSE
+  (protan 4.9, normal 11.9 - FAIL), so the lighter amber is the optimum.

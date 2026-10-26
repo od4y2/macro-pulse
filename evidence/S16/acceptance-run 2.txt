@@ -1,0 +1,31 @@
+# S16 acceptance run - 2026-09-03 (regenerated after final ruff fixes to the demo script)
+# checkpoint before unit: 01935a5 (S15), working tree clean at start; baseline 416/416
+
+## Full test suite
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+451 passed, 1 warning in 8.80s
+
+## Unit-scoped tests only
+35 passed in 0.59s
+
+## Smoke
+MacroPulse query service smoke test passed: {'status': 'ok', 'data_mode': 'database'}
+
+## Ruff (unit-intended files)
+All checks passed!
+7 files already formatted
+
+## Pinned contract unchanged
+src/macropulse/api/schemas.py: byte-identical to 01935a5
+
+## Live demo (service on :8000, dev DB): evidence/S16/live-demo-output.txt
+observations served: 110; indicators: ['gdp_real_growth']
+facts: 110 real observations, 0 missing, 0 excluded
+claims built: {'level': 10, 'change': 10}
+validated: 20/20
+tampered value claim -> validated=False, reason=value_mismatch
+causal sentence -> banned: ['causal_phrase']
+banned phrases in rendered document: []
+=== persist the run (incl. the rejected tampered claim) and re-read ===
+run 2: model='deterministic-template', prompt_version='s16-v1', status='completed'
+claims stored: 21 (20 validated, 1 rejected)

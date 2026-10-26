@@ -289,8 +289,8 @@ with st.expander("Labels legend"):
         )
     )
 
-tab_country, tab_comparison, tab_provenance = st.tabs(
-    ["Country view", "Comparison view", "Provenance view"]
+tab_country, tab_comparison, tab_provenance, tab_briefing = st.tabs(
+    ["Country view", "Comparison view", "Provenance view", "AI briefing"]
 )
 
 # --- Country view: the current picture of one country ------------------------
@@ -503,6 +503,68 @@ with tab_provenance:
             "vintage per period is flagged. Superseded vintages are retained "
             "for revision transparency (RQ4) - nothing is overwritten."
         )
+
+# --- AI briefing: on-demand structured document for one country ----------------
+
+with tab_briefing:
+    st.caption(
+        "On demand, one country at a time: statements derived only from "
+        "validated observations (evidence: real), adjudicated claim by claim "
+        "against that JSON, and screened for banned phrasing and fabricated "
+        "numbers. Every generation appends an audit run. When the LLM prose "
+        "source is unavailable or its draft fails a gate, the deterministic "
+        "template document is served instead - with a warning naming the "
+        "reason. No forecasts, no causal claims, no investment advice."
+    )
+    briefing_iso3 = st.selectbox(
+        "Country (briefing)",
+        list(country_labels),
+        format_func=lambda iso3: f"{iso3} — {country_labels[iso3]}",
+    )
+    if st.button("Generate briefing", type="primary"):
+        try:
+            with st.spinner("Generating briefing (LLM call may take a minute)..."):
+                st.session_state["briefing_result"] = QueryServiceClient(
+                    API_URL
+                ).generate_briefing(briefing_iso3)
+        except QueryServiceError as exc:
+            st.error(f"Briefing generation failed: {exc}")
+
+    result = st.session_state.get("briefing_result")
+    if result is None:
+        st.info(
+            "No briefing generated yet. Choose a country and press "
+            "**Generate briefing** - each press is one real generation "
+            "(nothing here is cached or replayed)."
+        )
+    else:
+        if result.get("warning"):
+            st.warning(
+                f"Served by the deterministic fallback - {result['warning']}"
+            )
+        st.markdown(result.get("prose", ""))
+        st.caption(
+            f"model: {result.get('model')} · prompt: "
+            f"{result.get('prompt_version')} · status: {result.get('status')} "
+            f"· run #{result.get('id')} · country: {result.get('country_iso3')}"
+        )
+        with st.expander("Adjudicated claims"):
+            st.dataframe(
+                [
+                    {
+                        "claim_text": c["claim_text"],
+                        "validated": c["validated"],
+                        "evidence_refs": len(c.get("evidence_refs", [])),
+                    }
+                    for c in result.get("claims", [])
+                ],
+                width="stretch",
+                hide_index=True,
+            )
+            st.caption(
+                "Every candidate claim - passed and rejected - as persisted "
+                "with the run; rejected text never reaches the document."
+            )
 
 st.divider()
 st.caption(

@@ -15,25 +15,35 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from macropulse.api import methodology, routes
+from macropulse.api import briefing, methodology, routes
 from macropulse.api.deps import DbSession
 from macropulse.api.schemas import HealthOut
+from macropulse.briefing import LlmSource
 from macropulse.db.base import database_url, make_engine, make_session_factory
 
 
-def create_app(session_factory: Callable[[], Session] | None = None) -> FastAPI:
+def create_app(
+    session_factory: Callable[[], Session] | None = None,
+    llm_source_factory: Callable[[], LlmSource] | None = None,
+) -> FastAPI:
     """Assemble the query service.
 
     The session factory is injectable so tests can bind the service to a
     dedicated database; production reads ``DATABASE_URL`` (engines connect
-    lazily, so importing this module never opens a connection).
+    lazily, so importing this module never opens a connection). The LLM
+    prose-source factory is injectable the same way (tests pass a fake);
+    when unset, ``POST /briefing`` resolves ``LLM_*`` from the environment
+    at call time and falls back deterministically when absent - importing
+    this module never reads LLM configuration.
     """
     if session_factory is None:
         session_factory = make_session_factory(make_engine(database_url()))
     app = FastAPI(title="MacroPulse", version="0.1.0")
     app.state.session_factory = session_factory
+    app.state.llm_source_factory = llm_source_factory
     app.include_router(routes.router)
     app.include_router(methodology.router)
+    app.include_router(briefing.router)
 
     @app.get("/health", response_model=HealthOut)
     def health(db: DbSession) -> HealthOut:

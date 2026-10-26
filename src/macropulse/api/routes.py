@@ -19,7 +19,8 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Query, Response
 from sqlalchemy import ColumnElement, and_, func
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.sql.selectable import Subquery
 
 from macropulse.api.deps import DbSession
 from macropulse.api.schemas import (
@@ -92,6 +93,43 @@ def _latest_version(versions: list[MetricVersion]) -> MetricVersion | None:
     if not versions:
         return None
     return max(versions, key=lambda v: (v.created_at, v.version))
+
+
+def latest_vintage_subquery(
+    db: Session, filters: list[ColumnElement[bool]]
+) -> Subquery:
+    """Max vintage per (indicator, country, period, source) under ``filters``.
+
+    Shared by ``list_observations`` and the briefing endpoint so both
+    serve the identical vintage contract: the filters restrict which
+    vintages compete, and the newest per group wins.
+    """
+    sub = db.query(
+        NormalizedObservation.indicator_id.label("indicator_id"),
+        NormalizedObservation.country_iso3.label("country_iso3"),
+        NormalizedObservation.period.label("period"),
+        NormalizedObservation.source_id.label("source_id"),
+        func.max(NormalizedObservation.vintage).label("max_vintage"),
+    )
+    for f in filters:
+        sub = sub.filter(f)
+    return sub.group_by(
+        NormalizedObservation.indicator_id,
+        NormalizedObservation.country_iso3,
+        NormalizedObservation.period,
+        NormalizedObservation.source_id,
+    ).subquery()
+
+
+def latest_vintage_condition(latest_sq: Subquery) -> ColumnElement[bool]:
+    """Join predicate keeping only rows at their group's max vintage."""
+    return and_(
+        NormalizedObservation.indicator_id == latest_sq.c.indicator_id,
+        NormalizedObservation.country_iso3 == latest_sq.c.country_iso3,
+        NormalizedObservation.period == latest_sq.c.period,
+        NormalizedObservation.source_id == latest_sq.c.source_id,
+        NormalizedObservation.vintage == latest_sq.c.max_vintage,
+    )
 
 
 @router.get("/countries", response_model=list[CountryOut])
@@ -186,31 +224,8 @@ def list_observations(
         query = query.filter(f)
 
     if latest_vintage:
-        sub = db.query(
-            NormalizedObservation.indicator_id.label("indicator_id"),
-            NormalizedObservation.country_iso3.label("country_iso3"),
-            NormalizedObservation.period.label("period"),
-            NormalizedObservation.source_id.label("source_id"),
-            func.max(NormalizedObservation.vintage).label("max_vintage"),
-        )
-        for f in filters:
-            sub = sub.filter(f)
-        latest_sq = sub.group_by(
-            NormalizedObservation.indicator_id,
-            NormalizedObservation.country_iso3,
-            NormalizedObservation.period,
-            NormalizedObservation.source_id,
-        ).subquery()
-        query = query.join(
-            latest_sq,
-            and_(
-                NormalizedObservation.indicator_id == latest_sq.c.indicator_id,
-                NormalizedObservation.country_iso3 == latest_sq.c.country_iso3,
-                NormalizedObservation.period == latest_sq.c.period,
-                NormalizedObservation.source_id == latest_sq.c.source_id,
-                NormalizedObservation.vintage == latest_sq.c.max_vintage,
-            ),
-        )
+        latest_sq = latest_vintage_subquery(db, filters)
+        query = query.join(latest_sq, latest_vintage_condition(latest_sq))
 
     response.headers["X-Total-Count"] = str(query.count())
     rows = (

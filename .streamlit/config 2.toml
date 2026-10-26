@@ -1,0 +1,16 @@
+# MacroPulse dashboard theme (unit S18).
+#
+# Pinned to light: the validated token set in
+# src/macropulse/views/theme.py is light-mode only by decision (a dark
+# variant would be its own validated palette, not an automatic flip).
+# Tokens mirror theme.py: warm paper page, claret accent, near-black ink.
+[theme]
+base = "light"
+primaryColor = "#9d2244"
+backgroundColor = "#fdfdfc"
+secondaryBackgroundColor = "#f2f0ea"
+textColor = "#0b0b0b"
+
+[server]
+# Charts and tables carry data; keep the header clean for the wide layout.
+headless = true

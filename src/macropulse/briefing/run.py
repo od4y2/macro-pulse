@@ -15,11 +15,18 @@ from macropulse.briefing.claims import Adjudication, Claim
 from macropulse.db.models import BriefingClaim, BriefingRun
 
 # Recorded generator identities. The S16 generator is deterministic
-# templates (no LLM is called; no key exists in this environment) - the
-# row says so honestly. An LLM attached later records its own identifier
-# under the same schema.
+# templates - the row says so honestly. An LLM prose source (briefing/
+# llm.py) records its own identifier under the same schema; when the LLM
+# path fails its gates, the run falls back to the deterministic document
+# and records that identity with status "fallback".
 DETERMINISTIC_MODEL = "deterministic-template"
 DETERMINISTIC_PROMPT_VERSION = "s16-v1"
+
+# Closed vocabulary for the status column (String(16)): "completed" is a
+# successful run of whatever generator the model column names;
+# "fallback" marks a run whose document came from the deterministic
+# templates because the requested generator could not be used or failed.
+BRIEFING_STATUSES = ("completed", "fallback")
 
 
 def record_briefing_run(
@@ -28,12 +35,14 @@ def record_briefing_run(
     model: str,
     prompt_version: str,
     adjudicated: list[tuple[Claim, Adjudication]],
+    status: str = "completed",
 ) -> int:
     """Persist one run and all its claims; return the run id.
 
     ``model`` and ``prompt_version`` must fit their schema columns
     (128 / 32 chars) - a truncated generator identity would be a
     corrupted audit record, so over-long values raise instead.
+    ``status`` comes from the closed ``BRIEFING_STATUSES`` vocabulary.
     """
     if len(model) > 128:
         raise ValueError(f"model {model!r} exceeds the 128-char column")
@@ -41,8 +50,10 @@ def record_briefing_run(
         raise ValueError(
             f"prompt_version {prompt_version!r} exceeds the 32-char column"
         )
+    if status not in BRIEFING_STATUSES:
+        raise ValueError(f"status {status!r} outside {BRIEFING_STATUSES}")
 
-    run = BriefingRun(model=model, prompt_version=prompt_version, status="completed")
+    run = BriefingRun(model=model, prompt_version=prompt_version, status=status)
     session.add(run)
     session.flush()  # allocate run.id before the claims reference it
     for claim, adjudication in adjudicated:

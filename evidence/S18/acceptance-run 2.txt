@@ -1,0 +1,22 @@
+=== S18 acceptance run — 2026-09-24T09:10:36Z ===
+
+--- git HEAD ---
+708476c Neon CLI project setup: config files and ignores
+
+--- 1. full test suite ---
+545 passed, 1 warning in 10.30s
+
+--- 2. query service smoke ---
+MacroPulse query service smoke test passed: {'status': 'ok', 'data_mode': 'database'}
+
+--- 3. ruff check (src, tests, app, evidence/S18) ---
+All checks passed!
+
+--- 4. S13 pin: api/schemas.py byte-identical to 63d867f ---
+0
+
+--- 5. live demo (evidence/S18/live-demo-output.txt) ---
+
+DEMO PASSED
+== disposable database macropulse_s18_demo dropped ==
+EXIT_CODE=0

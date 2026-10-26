@@ -1,0 +1,14 @@
+# S10 evidence - 2026-08-29T08:18:44Z (re-run after ruff fix)
+
+## Acceptance run (full suite)
+.............................................                            [100%]
+261 passed in 3.74s
+
+## New unit tests
+21 passed in 0.01s
+
+## Ruff (unit-intended files)
+All checks passed!
+
+## Smoke
+MacroPulse starter smoke test passed

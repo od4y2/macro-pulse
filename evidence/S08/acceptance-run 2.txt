@@ -1,0 +1,14 @@
+# S08 evidence - 2026-08-29T07:53:25Z
+
+## Acceptance run (full suite)
+.......................................................                  [100%]
+199 passed in 4.51s
+
+## New unit tests
+43 passed in 1.32s
+
+## Ruff (unit-intended files)
+All checks passed!
+
+## Smoke
+MacroPulse starter smoke test passed
