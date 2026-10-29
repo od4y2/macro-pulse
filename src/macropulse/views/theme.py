@@ -104,6 +104,15 @@ FONT_SANS = "system-ui, -apple-system, 'Segoe UI', sans-serif"
 LINE_WIDTH_FOCUS = 2.5
 LINE_WIDTH_CONTEXT = 1.75
 
+# Isolated observed points (both grid neighbours missing - the survey-
+# wave shape, e.g. Findex account ownership) render as explicit markers:
+# a line-only trace with unconnected gaps would make a REAL observation
+# invisible. The page-colored outline keeps the mark legible over grid-
+# lines and episode bands; dense series never grow markers (the mark
+# spec above still holds - this only rescues points a line cannot reach).
+MARKER_SIZE_ISOLATED = 8
+MARKER_OUTLINE_WIDTH = 1.25
+
 TITLE_SIZE = 17
 TICK_SIZE = 11
 
@@ -202,6 +211,8 @@ __all__ = [
     "INK_SECONDARY",
     "LINE_WIDTH_CONTEXT",
     "LINE_WIDTH_FOCUS",
+    "MARKER_OUTLINE_WIDTH",
+    "MARKER_SIZE_ISOLATED",
     "PAGE",
     "country_color",
     "focus_label_point",

@@ -12,7 +12,11 @@ Governance carried into display structures:
 - every observation keeps its provenance (source, vintage, evidence
   label, quality grade, release/retrieval times);
 - chart series keep ``None`` for missing points so charts render gaps,
-  never interpolated lines.
+  never interpolated lines;
+- an OBSERVED point a line cannot reach (both grid neighbours missing -
+  the survey-wave shape, e.g. Findex account ownership) is reported by
+  ``isolated_point_indices`` so the renderer marks it explicitly:
+  a gap must stay a gap, but a real observation must never be invisible.
 """
 
 from __future__ import annotations
@@ -154,29 +158,69 @@ def chart_traces(observations: list[dict], country_order: list[str]) -> list[dic
     return traces
 
 
+def isolated_point_indices(xs: list, ys: list) -> list[int]:
+    """Indices of observed points no line segment can ever reach.
+
+    A point is isolated when its value is present but BOTH neighbours on
+    the trace's period grid (previous and next position, as served) are
+    missing - so with gaps left unconnected the point would render as
+    nothing at all. This is the survey-wave shape (Findex account
+    ownership: five observed years, every neighbour a recorded gap).
+    The renderer marks these points explicitly; the gaps around them
+    stay gaps. Pure index arithmetic - no values are invented, and dense
+    series (any observed neighbour) return few or no indices.
+    """
+    indices = []
+    for i, y in enumerate(ys):
+        if y is None:
+            continue
+        prev_observed = i > 0 and ys[i - 1] is not None
+        next_observed = i + 1 < len(ys) and ys[i + 1] is not None
+        if not prev_observed and not next_observed:
+            indices.append(i)
+    return indices
+
+
 def coverage_counts(observations: list[dict], country_order: list[str]) -> list[dict]:
     """Per-country observed/missing counts over the shared period grid.
 
     The grid is the union of periods across the (latest-vintage,
     one-indicator) selection; a country with no observation for a period
-    counts as missing there. This is a count, not a coverage judgment -
-    S09's gate thresholds are not applied here.
+    counts as missing there. ``missing`` splits into two kinds, which
+    are different facts and must never be conflated:
+
+    - ``source_no_data``: a row EXISTS with a NULL value - the provider
+      was asked and itself reported no value for that period (e.g. a
+      non-survey year of a survey series). A confirmed source gap, not
+      a retrieval omission.
+    - ``no_record``: the grid has the period but the country has NO row
+      at all - expected but missing; a retrieval/recording gap.
+
+    ``missing == source_no_data + no_record`` always holds. This is a
+    count, not a coverage judgment - S09's gate thresholds are not
+    applied here.
     """
     periods = sorted({o["period"] for o in observations})
     period_set = set(periods)
-    by_country: dict[str, set[str]] = {c: set() for c in country_order}
+    observed_by_country: dict[str, set[str]] = {c: set() for c in country_order}
+    rows_by_country: dict[str, set[str]] = {c: set() for c in country_order}
     for o in observations:
+        rows_by_country.setdefault(o["country_iso3"], set()).add(o["period"])
         if o["value"] is not None:
-            by_country.setdefault(o["country_iso3"], set()).add(o["period"])
+            observed_by_country.setdefault(o["country_iso3"], set()).add(o["period"])
     rows = []
     for country in country_order:
-        observed_periods = by_country.get(country, set())
-        observed = observed_periods & period_set
+        observed = observed_by_country.get(country, set()) & period_set
+        recorded = rows_by_country.get(country, set()) & period_set
+        source_no_data = len(recorded - observed)
+        no_record = len(period_set - recorded)
         rows.append(
             {
                 "country": country,
                 "observed": len(observed),
                 "missing": len(period_set) - len(observed),
+                "source_no_data": source_no_data,
+                "no_record": no_record,
                 "total_periods": len(periods),
                 "first_observed": min(observed) if observed else None,
                 "last_observed": max(observed) if observed else None,

@@ -54,6 +54,7 @@ from macropulse.views.assembly import (
     comparison_matrix,
     country_view_rows,
     coverage_counts,
+    isolated_point_indices,
     provenance_rows,
 )
 from macropulse.views.client import QueryServiceClient, QueryServiceError
@@ -64,10 +65,14 @@ from macropulse.views.labels import (
     chart_caption,
     freshness_summary,
     merge_freshness,
+    missingness_note,
     quality_badge,
 )
 from macropulse.views.theme import (
     INK,
+    MARKER_OUTLINE_WIDTH,
+    MARKER_SIZE_ISOLATED,
+    PAGE,
     focus_label_point,
     layout_update,
     series_style,
@@ -198,7 +203,22 @@ def line_chart(
     provenance travels on hover exactly as before (S15). Documented
     episodes overlapping the rendered range draw as neutral bands with
     a citation in the caller's caption (S18).
+
+    Survey-wave series (e.g. Findex account ownership: five observed
+    years, every neighbour a source-recorded gap) would draw NO line at
+    all under ``mode="lines"`` + ``connectgaps=False`` - the real
+    observations would be invisible. An observed point both of whose
+    grid neighbours are missing therefore also gets an explicit marker
+    in the series color (``isolated_point_indices``); the gaps around it
+    stay gaps, and nothing is interpolated or zero-filled.
     """
+    hovertemplate = (
+        "%{x}<br>value: %{y}<br>"
+        "vintage: %{customdata[0]}<br>"
+        "evidence: %{customdata[1]}<br>"
+        "quality: %{customdata[2]}"
+        "<extra>%{fullData.name}</extra>"
+    )
     fig = go.Figure()
     first_period: str | None = None
     last_period: str | None = None
@@ -219,15 +239,36 @@ def line_chart(
                     [h["vintage"], h["evidence_label"], h["quality_grade"]]
                     for h in t["hover"]
                 ],
-                hovertemplate=(
-                    "%{x}<br>value: %{y}<br>"
-                    "vintage: %{customdata[0]}<br>"
-                    "evidence: %{customdata[1]}<br>"
-                    "quality: %{customdata[2]}"
-                    "<extra>%{fullData.name}</extra>"
-                ),
+                hovertemplate=hovertemplate,
             )
         )
+        isolated = isolated_point_indices(t["xs"], t["ys"])
+        if isolated:
+            # Markers only where a line cannot reach: the actual survey
+            # years, highlighted; hover provenance identical to the line.
+            fig.add_trace(
+                go.Scatter(
+                    x=[t["xs"][i] for i in isolated],
+                    y=[t["ys"][i] for i in isolated],
+                    mode="markers",
+                    name=t["country"],
+                    showlegend=False,  # identity already carried by the line trace
+                    marker={
+                        "size": MARKER_SIZE_ISOLATED,
+                        "color": style["color"],
+                        "line": {"color": PAGE, "width": MARKER_OUTLINE_WIDTH},
+                    },
+                    customdata=[
+                        [
+                            t["hover"][i]["vintage"],
+                            t["hover"][i]["evidence_label"],
+                            t["hover"][i]["quality_grade"],
+                        ]
+                        for i in isolated
+                    ],
+                    hovertemplate=hovertemplate,
+                )
+            )
         if t["xs"]:
             first_period = t["xs"][0] if first_period is None else min(first_period, t["xs"][0])
             last_period = t["xs"][-1] if last_period is None else max(last_period, t["xs"][-1])
@@ -341,6 +382,9 @@ with tab_country:
                 if band_caption:
                     st.caption(band_caption)
                 st.caption(chart_caption(obs))
+                note = missingness_note(obs)
+                if note:
+                    st.caption(note)
             elif len(units) > 1:
                 st.warning(
                     "Several indicators selected with different units "
@@ -445,6 +489,9 @@ with tab_comparison:
                 if band_caption:
                     st.caption(band_caption)
                 st.caption(chart_caption(obs))
+                note = missingness_note(obs)
+                if note:
+                    st.caption(note)
             st.dataframe(
                 comparison_matrix(obs, comparison_countries),
                 width="stretch",

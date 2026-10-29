@@ -40,6 +40,22 @@ exactly one indicator (one unit) is selected — several indicators with
 different units never share a chart axis, because a shared axis would
 mislead; the table is shown instead.
 
+**Survey-wave series are visible, not blank.** For an indicator whose
+observed points are isolated — every grid neighbour a recorded gap (the
+Global Findex shape: five survey years, e.g. 2011/2014/2017/2021/2024,
+the years between source-confirmed empty) — a line-only trace with
+`connectgaps=False` would draw *nothing at all*. An observed point both
+of whose neighbours are missing therefore also renders as an explicit
+marker in the series color (`isolated_point_indices`, pure and tested):
+the actual survey years stand out, the gaps around them stay gaps, and
+nothing is interpolated or zero-filled. A **missingness note** under the
+chart separates the two kinds of absence: periods the source itself
+reports no value for (named with their `missing_reason` — non-survey
+years of a survey series, *not* retrieval omissions) vs. grid periods
+with no record at all (*expected but missing* — a retrieval/recording
+gap). Observed periods are listed by name when there are ≤10 of them,
+counted otherwise.
+
 ### Comparison view
 One indicator across selected countries: a focus-and-context line chart
 (one **focus country** wears its entity hue; every other economy renders
@@ -48,7 +64,12 @@ periods × countries matrix, and per-country coverage counts (observed /
 missing / total periods, first and last observed). The matrix names
 missing cells — never blank, zero, or interpolated; the chart leaves
 gaps (`connectgaps=False`) rather than drawing lines through missing
-periods.
+periods, with markers on isolated observed points and the missingness
+note exactly as in the country view. The coverage counts split
+`missing` into `source_no_data` (a row exists with a NULL value — the
+provider was asked and reported nothing) and `no_record` (the grid has
+the period but the country has no row at all); the split always sums
+back to `missing`.
 
 ### Provenance view
 Revision transparency (RQ4): every stored vintage for one country +
@@ -91,6 +112,15 @@ it":
 - **Chart captions** state only what the chart shows — economies,
   periods, evidence labels, vintage range, and missing-point count are
   all computed from the observations actually rendered.
+- **Missingness note** (`missingness_note`, pure and tested): under
+  every chart, a second caption separates *source-confirmed gaps* (rows
+  with NULL values, named with their recorded `missing_reason` — e.g.
+  the non-survey years of a survey series; retrieval happened, the
+  source itself has no value) from *unrecorded grid periods* (no row at
+  all where the shared grid expects one — expected but missing). It
+  lists the observed periods by name when few (survey waves) and always
+  ends with "Nothing is interpolated or zero-filled." Absent when
+  nothing is missing.
 - **Provenance on hover**: chart points show value, vintage, evidence
   label, and quality grade in the tooltip, at full precision — tooltips
   match the tables.
@@ -160,18 +190,25 @@ the error state.
 
 ## Verification
 
-- `tests/test_views.py` (26 tests): the client is exercised against
+- `tests/test_views.py` (38 tests): the client is exercised against
   `httpx.MockTransport` (pagination until the announced total, filter
   pass-through, HTTP/transport errors wrapped as `QueryServiceError`,
   refusal of over-delivery) and the assembly functions are tested as
   pure data transformations (missing marking, vintage-chain flagging,
-  gap preservation, coverage counting, empty inputs).
-- `tests/test_labels.py` (22 tests): badge vocabulary coverage and
+  gap preservation, coverage counting with the `source_no_data` /
+  `no_record` split summing to `missing`, isolated-point detection for
+  survey-wave series — all-isolated, dense, edge, single-gap, run
+  interior, empty inputs).
+- `tests/test_labels.py` (29 tests): badge vocabulary coverage and
   unknown-grade visibility; freshness boundary arithmetic (exactly 2
   steps → lagging, 1.92 → current; quarterly boundaries), observed-only
   measurement, grouping, negative ages not clamped, unknown frequency
   rejected; coverage/freshness merge with `no_data` defaults; chart
   captions (normal, singular, vintage range, missing clause, empty);
+  the missingness note (survey years listed and source gaps named with
+  their reason, unrecorded grid periods flagged as expected-but-missing,
+  count-not-list above 10 observed periods, `None` when nothing is
+  missing, reason-less NULL still a source gap, no zero-fill);
   per-point hover provenance parallel to the rendered points.
 - `evidence/S14/live-demo-output.txt`: the real dashboard script run
   against the live service via Streamlit's AppTest harness — all three

@@ -148,6 +148,85 @@ def merge_freshness(
     return merged
 
 
+# Presentation convention: at most this many distinct observed periods
+# are listed by name in the missingness note (a survey-wave series has
+# a handful; an annual series has 60+ and gets a count instead).
+OBSERVED_PERIODS_LIST_MAX = 10
+
+
+def missingness_note(observations: list[dict]) -> str | None:
+    """Caption text distinguishing the two kinds of chart gaps.
+
+    The chart leaves gaps for missing periods (never interpolated, never
+    zero-filled), but "missing" is two different facts and this note
+    keeps them apart:
+
+    - **source-confirmed gaps** - a row exists with a NULL value and a
+      recorded ``missing_reason``: the provider was asked and itself
+      reports no value for that period (the non-survey years of a survey
+      series such as the Findex). NOT a retrieval omission.
+    - **unrecorded grid periods** - the shared period grid (the union
+      across the selection) has the period but a country has no row at
+      all: expected but missing, i.e. a retrieval/recording gap.
+
+    Observed periods are listed by name when there are few enough to
+    read (survey waves), counted otherwise. ``None`` when nothing is
+    missing - no note is better than an empty one. Pure: every claim in
+    the text derives from the observations passed in.
+    """
+    if not observations:
+        return None
+    grid = sorted({o["period"] for o in observations})
+    countries = sorted({o["country_iso3"] for o in observations})
+    recorded: dict[str, dict[str, dict]] = {c: {} for c in countries}
+    for o in observations:
+        recorded[o["country_iso3"]][o["period"]] = o
+
+    observed_periods = sorted(
+        {o["period"] for o in observations if o["value"] is not None}
+    )
+    reasons: dict[str, int] = {}
+    source_gaps = 0
+    unrecorded: dict[str, int] = {}
+    for country in countries:
+        rows = recorded[country]
+        for period in grid:
+            row = rows.get(period)
+            if row is None:
+                unrecorded[country] = unrecorded.get(country, 0) + 1
+            elif row["value"] is None:
+                source_gaps += 1
+                reason = row["missing_reason"] or "no reason recorded"
+                reasons[reason] = reasons.get(reason, 0) + 1
+    if not source_gaps and not unrecorded:
+        return None
+
+    if len(observed_periods) <= OBSERVED_PERIODS_LIST_MAX:
+        parts = ["observed: " + ", ".join(observed_periods)]
+    else:
+        parts = [f"{len(observed_periods)} observed periods"]
+    if source_gaps:
+        reason_text = ", ".join(
+            f"{reason} x{count}" for reason, count in sorted(reasons.items())
+        )
+        parts.append(
+            f"{source_gaps} period"
+            f"{'' if source_gaps == 1 else 's'} the source itself reports "
+            f"no value for ({reason_text}) - source-confirmed gaps "
+            "(e.g. non-survey years of a survey series), not retrieval "
+            "omissions"
+        )
+    if unrecorded:
+        total = sum(unrecorded.values())
+        detail = ", ".join(f"{c} x{n}" for c, n in sorted(unrecorded.items()))
+        parts.append(
+            f"{total} grid period"
+            f"{'' if total == 1 else 's'} with no record at all ({detail}) "
+            "- expected but missing (a retrieval/recording gap)"
+        )
+    return " · ".join(parts) + ". Nothing is interpolated or zero-filled."
+
+
 def chart_caption(observations: list[dict]) -> str:
     """One-line provenance summary for a chart, built from the data shown.
 

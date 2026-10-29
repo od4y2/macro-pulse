@@ -13,6 +13,7 @@ from macropulse.views.assembly import (
     comparison_matrix,
     country_view_rows,
     coverage_counts,
+    isolated_point_indices,
     provenance_rows,
 )
 from macropulse.views.client import (
@@ -28,6 +29,7 @@ from macropulse.views.labels import (
     chart_caption,
     freshness_summary,
     merge_freshness,
+    missingness_note,
     quality_badge,
 )
 
@@ -45,7 +47,9 @@ __all__ = [
     "country_view_rows",
     "coverage_counts",
     "freshness_summary",
+    "isolated_point_indices",
     "merge_freshness",
+    "missingness_note",
     "provenance_rows",
     "quality_badge",
 ]

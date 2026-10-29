@@ -18,6 +18,7 @@ from macropulse.views.assembly import (
     comparison_matrix,
     country_view_rows,
     coverage_counts,
+    isolated_point_indices,
     provenance_rows,
 )
 from macropulse.views.client import (
@@ -417,6 +418,35 @@ def test_coverage_counts_observed_and_missing_over_union_grid() -> None:
     assert by_country["JPN"]["first_observed"] is None
 
 
+def test_coverage_counts_split_source_no_data_from_no_record() -> None:
+    # The two missingness kinds are different facts: a NULL row the
+    # source itself reported vs. a grid period with no row at all.
+    rows = coverage_counts(
+        [
+            obs(country_iso3="USA", period="2011-01-01", value=60.0),
+            obs(
+                country_iso3="USA",
+                period="2012-01-01",
+                value=None,
+                missing_reason="wb_missing_value",
+            ),
+            # USA has NO row for 2013-01-01; BRA puts it on the grid.
+            obs(country_iso3="BRA", period="2013-01-01", value=55.0),
+        ],
+        ["USA", "BRA"],
+    )
+    by_country = {r["country"]: r for r in rows}
+    usa = by_country["USA"]
+    assert usa["observed"] == 1
+    assert usa["source_no_data"] == 1  # 2012: row exists, value NULL
+    assert usa["no_record"] == 1  # 2013: on the grid, no row at all
+    assert usa["missing"] == usa["source_no_data"] + usa["no_record"] == 2
+    bra = by_country["BRA"]
+    assert bra["source_no_data"] == 0
+    assert bra["no_record"] == 2  # 2011 and 2012 have no BRA row
+    assert bra["missing"] == 2
+
+
 def test_coverage_counts_empty_input() -> None:
     rows = coverage_counts([], ["USA"])
     assert rows == [
@@ -424,11 +454,57 @@ def test_coverage_counts_empty_input() -> None:
             "country": "USA",
             "observed": 0,
             "missing": 0,
+            "source_no_data": 0,
+            "no_record": 0,
             "total_periods": 0,
             "first_observed": None,
             "last_observed": None,
         }
     ]
+
+
+# --- assembly: isolated observed points (survey-wave shape) ----------------------
+
+
+def test_isolated_points_all_isolated_survey_wave() -> None:
+    # Findex shape: every observed year is surrounded by recorded gaps.
+    xs = ["2010-01-01", "2011-01-01", "2012-01-01", "2013-01-01", "2014-01-01"]
+    ys = [None, 60.0, None, None, 70.0]
+    assert isolated_point_indices(xs, ys) == [1, 4]
+
+
+def test_isolated_points_dense_series_has_none() -> None:
+    ys = [1.0, 2.0, 3.0, 4.0]
+    assert isolated_point_indices(["a", "b", "c", "d"], ys) == []
+
+
+def test_isolated_points_edges_count_as_isolated() -> None:
+    # A point at the series edge has only one neighbour; if that
+    # neighbour is missing, no line can reach the point.
+    assert isolated_point_indices(["a", "b", "c"], [1.0, None, None]) == [0]
+    assert isolated_point_indices(["a", "b", "c"], [None, None, 3.0]) == [2]
+
+
+def test_isolated_points_single_gap_separates_two_isolated_points() -> None:
+    # connectgaps=False draws no segment across a gap, so 1.0 and 3.0
+    # are BOTH unreachable by any line and both must be marked.
+    assert isolated_point_indices(["a", "b", "c"], [1.0, None, 3.0]) == [0, 2]
+
+
+def test_isolated_points_interior_of_observed_run_is_not_isolated() -> None:
+    # Inside a run of observed points the line renders; only a point
+    # cut off from every run needs a marker.
+    ys = [1.0, 2.0, None, None, 5.0]
+    assert isolated_point_indices(["a", "b", "c", "d", "e"], ys) == [4]
+
+
+def test_isolated_points_all_missing_or_empty() -> None:
+    assert isolated_point_indices(["a", "b"], [None, None]) == []
+    assert isolated_point_indices([], []) == []
+
+
+def test_isolated_points_single_observation() -> None:
+    assert isolated_point_indices(["a"], [2.5]) == [0]
 
 
 # --- full-pipeline sanity over a mocked service ------------------------------------

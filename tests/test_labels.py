@@ -15,10 +15,12 @@ from macropulse.views.labels import (
     FRESHNESS_LAG_STEPS,
     FRESHNESS_STATES,
     GRADE_MEANINGS,
+    OBSERVED_PERIODS_LIST_MAX,
     QUALITY_BADGES,
     chart_caption,
     freshness_summary,
     merge_freshness,
+    missingness_note,
     quality_badge,
 )
 
@@ -286,6 +288,85 @@ def test_chart_caption_names_missing_points() -> None:
 
 def test_chart_caption_empty_input() -> None:
     assert chart_caption([]) == "No observations."
+
+
+# --- missingness note (survey-wave gaps vs unrecorded periods) -------------------------
+
+
+def _findex_shape() -> list[dict]:
+    """The account_ownership_pct shape: five survey years observed, the
+    years between recorded by the source itself as having no value."""
+    rows = []
+    for year in range(2010, 2016):
+        if year in (2011, 2014):
+            rows.append(obs(period=f"{year}-01-01", value=60.0 + year - 2010))
+        else:
+            rows.append(
+                obs(
+                    period=f"{year}-01-01",
+                    value=None,
+                    missing_reason="wb_missing_value",
+                )
+            )
+    return rows
+
+
+def test_missingness_note_lists_survey_years_and_names_source_gaps() -> None:
+    note = missingness_note(_findex_shape())
+    assert note is not None
+    assert "observed: 2011-01-01, 2014-01-01" in note
+    assert "4 periods the source itself reports no value for" in note
+    assert "wb_missing_value x4" in note
+    assert "not retrieval omissions" in note
+    assert "Nothing is interpolated or zero-filled" in note
+
+
+def test_missingness_note_flags_unrecorded_grid_periods() -> None:
+    # BRA's 2013 row puts the period on the grid; USA has no row there.
+    note = missingness_note(
+        [
+            obs(period="2013-01-01", value=2.0),
+            obs(country_iso3="BRA", period="2013-01-01", value=1.5),
+            obs(country_iso3="BRA", period="2014-01-01", value=1.7),
+        ]
+    )
+    assert note is not None
+    assert "1 grid period with no record at all (USA x1)" in note
+    assert "expected but missing" in note
+
+
+def test_missingness_note_counts_many_observed_periods_instead_of_listing() -> None:
+    rows = [obs(period=f"{2000 + i}-01-01", value=1.0) for i in range(12)]
+    rows.append(obs(period="2015-06-01", value=None, missing_reason="gap"))
+    note = missingness_note(rows)
+    assert note is not None
+    assert f"{12} observed periods" in note
+    assert "observed: " not in note
+    assert 12 > OBSERVED_PERIODS_LIST_MAX  # the convention the note follows
+
+
+def test_missingness_note_none_when_nothing_missing() -> None:
+    assert missingness_note([obs(), obs(period="2024-01-01")]) is None
+
+
+def test_missingness_note_none_on_empty_input() -> None:
+    assert missingness_note([]) is None
+
+
+def test_missingness_note_missing_row_without_reason_is_still_source_gap() -> None:
+    note = missingness_note([obs(), obs(period="2024-01-01", value=None)])
+    assert note is not None
+    assert "no reason recorded x1" in note
+    assert "grid period" not in note  # a row exists -> recorded, not absent
+
+
+def test_missingness_note_never_zero_fills_or_imputes() -> None:
+    # The note describes the data as served; it must not introduce
+    # values, and the sentence promising no zero-fill is always present.
+    note = missingness_note(_findex_shape())
+    assert note is not None
+    assert "0.0" not in note
+    assert "zero-filled" in note
 
 
 # --- hover provenance on chart traces (assembly, S15 addition) ------------------------
