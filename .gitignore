@@ -9,6 +9,12 @@ __pycache__/
 *.pyc
 *.egg-info/
 .DS_Store
+# macOS Finder duplicate copies ("name 2.ext" beside the original) -
+# local-only artifacts, never tracked (2026-10-29: 143 such copies,
+# all byte-identical to their originals, untracked via git rm --cached).
+# Matches a basename containing " 2."; contains no slash, so it applies
+# at any depth and cannot cross directory boundaries.
+* 2.*
 Configure-OpenCode-VolcengineArk-macOS.zsh
 setup_claude_glm52_mac_ark.zsh
 setup_opencode_glm52_ark_mac.zsh
