@@ -84,6 +84,7 @@ BRIDGED_LLM_KEYS = (
     "LLM_MODEL",
     "LLM_API_KEY",
     "LLM_EXTRA_BODY",
+    "LLM_TIMEOUT_SECONDS",
 )
 
 

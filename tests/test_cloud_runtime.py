@@ -67,6 +67,16 @@ def test_bridge_key_stringifies_non_str(monkeypatch, clean_env) -> None:
     assert os.environ["LLM_MODEL"] == "42"
 
 
+def test_bridge_key_timeout_lands_verbatim(monkeypatch, clean_env) -> None:
+    import os
+
+    assert (
+        _bridge_key({"LLM_TIMEOUT_SECONDS": "120"}, "LLM_TIMEOUT_SECONDS")
+        is True
+    )
+    assert os.environ["LLM_TIMEOUT_SECONDS"] == "120"
+
+
 def test_bridged_llm_keys_vocabulary() -> None:
     # The names the briefing layer reads at call time - and only those;
     # the bridge never invents new configuration surface.
@@ -76,6 +86,7 @@ def test_bridged_llm_keys_vocabulary() -> None:
         "LLM_MODEL",
         "LLM_API_KEY",
         "LLM_EXTRA_BODY",
+        "LLM_TIMEOUT_SECONDS",
     )
 
 

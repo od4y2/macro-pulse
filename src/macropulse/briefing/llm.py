@@ -24,6 +24,11 @@ contract:
   counts (``build_prompt``) - the LLM never sees raw database rows, and
   its output is gated downstream by ``check_prose`` and
   ``check_numeric_fidelity`` before it may render.
+- Timeout: the read timeout defaults to ``LLM_TIMEOUT_SECONDS`` and is
+  overridable per deployment via the ``LLM_TIMEOUT_SECONDS`` environment
+  variable (read at call time, validated against ``LLM_TIMEOUT_MIN`` /
+  ``LLM_TIMEOUT_MAX``). It is nested inside the dashboard client's
+  ``BRIEFING_TIMEOUT`` so the deterministic fallback renders in-request.
 - Secret hygiene: the API key lives in a ``SecretStr``; error messages
   carry the HTTP status and a truncated body only, never the key.
 """
@@ -42,9 +47,18 @@ from macropulse.briefing.claims import Claim
 from macropulse.briefing.facts import BriefingFacts
 
 # Nested timeout budget (see plan D11): the LLM call must fail before the
-# dashboard-side client timeout so the deterministic fallback still
-# renders inside the API request.
-LLM_TIMEOUT_SECONDS = 45.0
+# dashboard-side client timeout (views/client.py BRIEFING_TIMEOUT, 120 s)
+# so the deterministic fallback still renders inside the API request.
+# Default sized against the real panel-scale prompt (~20 K tokens,
+# 19-32 s generations measured from the best-case network 2026-10-29;
+# the cross-border cloud path needs headroom past that). Per-deployment
+# override: the LLM_TIMEOUT_SECONDS environment variable, read at call
+# time like every other LLM_* key.
+LLM_TIMEOUT_SECONDS = 90.0
+
+# Sanity bounds for the environment override, in seconds.
+LLM_TIMEOUT_MIN = 1.0
+LLM_TIMEOUT_MAX = 600.0
 
 # Recorded in briefing_runs.prompt_version (String(32)).
 LLM_PROMPT_VERSION = "llm-v1"
@@ -88,6 +102,9 @@ class LLMSettings(BaseModel):
     # Provider-interop knobs merged UNDER the fixed request keys (the
     # client never lets this override model/messages/temperature).
     extra_body: dict[str, Any] = Field(default_factory=dict)
+    # Read timeout for the /chat/completions call; env-overridable
+    # (LLM_TIMEOUT_SECONDS), validated at parse time.
+    timeout_seconds: float = LLM_TIMEOUT_SECONDS
 
     @classmethod
     def from_env(cls) -> LLMSettings:
@@ -126,12 +143,16 @@ class LLMSettings(BaseModel):
                 "LLM_MODEL exceeds the 128-char briefing_runs.model column"
             )
         extra_body = _parse_extra_body(os.environ.get("LLM_EXTRA_BODY", ""))
+        timeout_seconds = _parse_timeout(
+            os.environ.get("LLM_TIMEOUT_SECONDS", "")
+        )
         return cls(
             provider=provider,
             base_url=base_url.rstrip("/"),
             model=model,
             api_key=SecretStr(api_key),
             extra_body=extra_body,
+            timeout_seconds=timeout_seconds,
         )
 
 
@@ -153,6 +174,29 @@ def _parse_extra_body(raw: str) -> dict[str, Any]:
     if not isinstance(parsed, dict):
         raise LLMConfigError("LLM_EXTRA_BODY must be a JSON object")
     return parsed
+
+
+def _parse_timeout(raw: str) -> float:
+    """Parse the ``LLM_TIMEOUT_SECONDS`` read-timeout override.
+
+    Empty means the default (``LLM_TIMEOUT_SECONDS``). A non-numeric or
+    out-of-bounds value is a typed configuration error naming the
+    variable (never its value), so the fallback path reports it honestly
+    rather than silently clamping.
+    """
+    raw = raw.strip()
+    if not raw:
+        return LLM_TIMEOUT_SECONDS
+    try:
+        value = float(raw)
+    except ValueError as exc:
+        raise LLMConfigError("LLM_TIMEOUT_SECONDS is not a number") from exc
+    if not LLM_TIMEOUT_MIN <= value <= LLM_TIMEOUT_MAX:
+        raise LLMConfigError(
+            f"LLM_TIMEOUT_SECONDS out of range "
+            f"[{LLM_TIMEOUT_MIN:g}, {LLM_TIMEOUT_MAX:g}]"
+        )
+    return value
 
 
 def build_system_prompt() -> str:
@@ -235,11 +279,16 @@ class HttpLlmSource:
         settings: LLMSettings,
         *,
         transport: httpx.BaseTransport | None = None,
-        timeout: float = LLM_TIMEOUT_SECONDS,
+        timeout: float | None = None,
     ) -> None:
         self._settings = settings
         self._transport = transport
-        self._timeout = timeout
+        # An explicit timeout wins (tests); otherwise the configured
+        # per-deployment value from settings, which from_env resolves
+        # from LLM_TIMEOUT_SECONDS with the module default behind it.
+        self._timeout = (
+            timeout if timeout is not None else settings.timeout_seconds
+        )
 
     @classmethod
     def from_env(cls) -> HttpLlmSource:

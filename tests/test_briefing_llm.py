@@ -16,6 +16,9 @@ import pytest
 
 from macropulse.briefing import (
     LLM_PROMPT_VERSION,
+    LLM_TIMEOUT_MAX,
+    LLM_TIMEOUT_MIN,
+    LLM_TIMEOUT_SECONDS,
     SUPPORTED_PROVIDERS,
     BriefingFacts,
     HttpLlmSource,
@@ -66,6 +69,7 @@ _LLM_ENV_NAMES = (
     "LLM_MODEL",
     "LLM_API_KEY",
     "LLM_EXTRA_BODY",
+    "LLM_TIMEOUT_SECONDS",
 )
 
 
@@ -78,8 +82,10 @@ def llm_env(monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
         "LLM_MODEL": "test-model-1",
         "LLM_API_KEY": TEST_KEY,
     }
-    # A developer's real LLM_EXTRA_BODY must never leak into tests.
+    # A developer's real LLM_EXTRA_BODY / LLM_TIMEOUT_SECONDS must never
+    # leak into tests - unset so the code defaults apply deterministically.
     monkeypatch.delenv("LLM_EXTRA_BODY", raising=False)
+    monkeypatch.delenv("LLM_TIMEOUT_SECONDS", raising=False)
     for name, value in values.items():
         monkeypatch.setenv(name, value)
     return values
@@ -167,6 +173,78 @@ def test_settings_extra_body_rejects_non_object(monkeypatch, llm_env) -> None:
     monkeypatch.setenv("LLM_EXTRA_BODY", "[1, 2]")
     with pytest.raises(LLMConfigError, match="JSON object"):
         LLMSettings.from_env()
+
+
+# --- timeout configuration ------------------------------------------------------
+
+
+def test_settings_timeout_defaults(llm_env) -> None:
+    # Unset -> the module default, which the nesting test in test_views
+    # pins below BRIEFING_TIMEOUT.
+    assert LLMSettings.from_env().timeout_seconds == LLM_TIMEOUT_SECONDS
+
+
+def test_settings_timeout_from_env(monkeypatch, llm_env) -> None:
+    monkeypatch.setenv("LLM_TIMEOUT_SECONDS", "30")
+    assert LLMSettings.from_env().timeout_seconds == 30.0
+    monkeypatch.setenv("LLM_TIMEOUT_SECONDS", " 120.5 ")
+    assert LLMSettings.from_env().timeout_seconds == 120.5
+
+
+def test_settings_timeout_accepts_bounds(monkeypatch, llm_env) -> None:
+    monkeypatch.setenv("LLM_TIMEOUT_SECONDS", str(LLM_TIMEOUT_MIN))
+    assert LLMSettings.from_env().timeout_seconds == LLM_TIMEOUT_MIN
+    monkeypatch.setenv("LLM_TIMEOUT_SECONDS", str(LLM_TIMEOUT_MAX))
+    assert LLMSettings.from_env().timeout_seconds == LLM_TIMEOUT_MAX
+
+
+@pytest.mark.parametrize("raw", ["abc", "12s", "1,5"])
+def test_settings_timeout_malformed_names_var_only(
+    monkeypatch, llm_env, raw: str
+) -> None:
+    monkeypatch.setenv("LLM_TIMEOUT_SECONDS", raw)
+    with pytest.raises(LLMConfigError) as excinfo:
+        LLMSettings.from_env()
+    message = str(excinfo.value)
+    assert "LLM_TIMEOUT_SECONDS" in message
+    assert raw.strip() not in message  # never values
+
+
+@pytest.mark.parametrize("raw", ["0", "-5", "601", "nan", "inf"])
+def test_settings_timeout_out_of_range(monkeypatch, llm_env, raw: str) -> None:
+    monkeypatch.setenv("LLM_TIMEOUT_SECONDS", raw)
+    with pytest.raises(LLMConfigError, match="out of range"):
+        LLMSettings.from_env()
+
+
+def test_http_source_uses_settings_timeout(monkeypatch, llm_env) -> None:
+    # The configured value must reach the wire, not just the settings.
+    monkeypatch.setenv("LLM_TIMEOUT_SECONDS", "33")
+    captured: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.append(request)
+        return httpx.Response(200, json=_ok_body("Growth stood at 2.9."))
+
+    source = _source(handler, LLMSettings.from_env())
+    source.generate("the prompt")
+    assert captured[0].extensions["timeout"]["read"] == 33.0
+
+
+def test_http_source_explicit_timeout_wins(monkeypatch, llm_env) -> None:
+    monkeypatch.setenv("LLM_TIMEOUT_SECONDS", "33")
+    captured: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.append(request)
+        return httpx.Response(200, json=_ok_body("Growth stood at 2.9."))
+
+    settings = LLMSettings.from_env()
+    source = HttpLlmSource(
+        settings, transport=httpx.MockTransport(handler), timeout=12.0
+    )
+    source.generate("the prompt")
+    assert captured[0].extensions["timeout"]["read"] == 12.0
 
 
 # --- prompts -------------------------------------------------------------------

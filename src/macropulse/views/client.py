@@ -17,10 +17,13 @@ DEFAULT_PAGE_SIZE = 500
 DEFAULT_BASE_URL = "http://127.0.0.1:8000"
 REQUEST_TIMEOUT = 30.0
 
-# Nested timeout budget (plan D11): the service's LLM call fails at 45 s
-# and renders the deterministic fallback inside the request, so the
-# client must wait longer than that - never abort before the fallback.
-BRIEFING_TIMEOUT = 75.0
+# Nested timeout budget (plan D11): the service's LLM call fails at its
+# LLM_TIMEOUT_SECONDS (default 90 s) and renders the deterministic
+# fallback inside the request, so the client must wait longer than that -
+# never abort before the fallback. Kept above the LLM default with margin
+# for a deployment that raises LLM_TIMEOUT_SECONDS toward its 600 s cap;
+# tests/test_views.py asserts LLM_TIMEOUT_SECONDS < BRIEFING_TIMEOUT.
+BRIEFING_TIMEOUT = 120.0
 
 _LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
 

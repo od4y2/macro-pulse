@@ -41,6 +41,8 @@ from macropulse.briefing.generate import (
 )
 from macropulse.briefing.llm import (
     LLM_PROMPT_VERSION,
+    LLM_TIMEOUT_MAX,
+    LLM_TIMEOUT_MIN,
     LLM_TIMEOUT_SECONDS,
     SUPPORTED_PROVIDERS,
     HttpLlmSource,
@@ -76,6 +78,8 @@ __all__ = [
     "DETERMINISTIC_PROMPT_VERSION",
     "FALLBACK_WARNINGS",
     "LLM_PROMPT_VERSION",
+    "LLM_TIMEOUT_MAX",
+    "LLM_TIMEOUT_MIN",
     "LLM_TIMEOUT_SECONDS",
     "REJECTION_REASONS",
     "SUPPORTED_PROVIDERS",

@@ -80,12 +80,26 @@ machine computes; the prose reports.
 - **Configuration** — read from the environment **at call time** (never
   at import): `LLM_PROVIDER` (closed vocabulary; only
   `openai-compatible`, the default), `LLM_BASE_URL`, `LLM_MODEL`,
-  `LLM_API_KEY`, and optionally `LLM_EXTRA_BODY`. Wire format: raw-httpx
+  `LLM_API_KEY`, and optionally `LLM_EXTRA_BODY` and
+  `LLM_TIMEOUT_SECONDS`. Wire format: raw-httpx
   `POST {LLM_BASE_URL}/chat/completions` (no SDK). The key lives in a
   `SecretStr`; error messages carry the HTTP status and a truncated body
-  only — never the key. Timeout: 45 s (`LLM_TIMEOUT_SECONDS`), nested
-  inside the dashboard client's 75 s (`BRIEFING_TIMEOUT`), so the LLM
-  fails first and the fallback still renders inside the request.
+  only — never the key.
+- **Read timeout (`LLM_TIMEOUT_SECONDS`)** — the `/chat/completions`
+  read timeout, overridable per deployment; unset it defaults to
+  `90 s`, and the value is validated against
+  [`LLM_TIMEOUT_MIN`, `LLM_TIMEOUT_MAX`] = [1, 600] s (a non-numeric or
+  out-of-range value is a typed config error → fallback, never a silent
+  clamp). Sized against the real panel-scale prompt: ~20 K tokens with
+  ~1.9 K-token completions measured 19–32 s from the best-case network,
+  and the cross-border cloud path (US runtime → the project's Beijing
+  endpoint) needs headroom past that — the earlier 45 s default timed
+  out there and rendered the honest `llm_transport_error` fallback. It
+  is nested inside the dashboard client's `120 s` (`BRIEFING_TIMEOUT`),
+  so the LLM fails first and the fallback still renders inside the
+  request; `tests/test_views.py` asserts `LLM_TIMEOUT_SECONDS <
+  BRIEFING_TIMEOUT`. On cloud hosts the key is bridged from `st.secrets`
+  like the other `LLM_*` vars.
 - **Provider interop (`LLM_EXTRA_BODY`)** — an optional JSON object
   merged UNDER the fixed request keys (`model`, `messages`,
   `temperature` always win; malformed JSON is a typed config error →
@@ -117,7 +131,7 @@ machine computes; the prose reports.
 
   | warning prefix | trigger |
   |---|---|
-  | `llm_not_configured` | `LLM_*` env missing/incomplete, provider unsupported, or `LLM_EXTRA_BODY` malformed |
+  | `llm_not_configured` | `LLM_*` env missing/incomplete, provider unsupported, `LLM_EXTRA_BODY` malformed, or `LLM_TIMEOUT_SECONDS` non-numeric/out-of-range |
   | `llm_transport_error` | endpoint unreachable, timeout, connection failure |
   | `llm_response_error` | non-200 status, malformed JSON, empty/misshapen prose |
   | `banned_phrase` | `check_prose` found a banned class (names it) |
