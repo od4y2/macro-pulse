@@ -115,3 +115,34 @@ carries modes `['lines','markers']` with marker xs exactly
 `2011/2014/2017/2021/2024` at the values above; MEX markers include
 `2022-01-01` and exclude `2021-01-01`; dense series (e.g.
 internet_users_pct) stay `['lines']` only.
+
+## Cloud confirmation (2026-10-29, after push of this fix)
+
+Push: `ecdbc31..e15bc62` on `main` (remote HEAD verified via
+`git ls-remote`); the live SCC app tracks `main` and redeploys
+automatically. Verified from the CLI:
+
+- **Production data (Neon, `neondb`)** — queried live via the Neon API:
+  `account_ownership_pct` carries exactly 5 valued survey-year rows per
+  economy (2011/2014/2017/2021/2024; MEX 2011/2014/2017/**2022**/2024)
+  plus 61 `wb_missing_value` rows each, all vintage `2026-09-10` — the
+  exact points the new marker traces render, identical to the dev DB and
+  the live WB fetch above.
+- **App reachable** — `GET https://macro-pulse-hl.streamlit.app/` → 200
+  serving the Streamlit shell (9782 bytes, same as the 2026-10-16
+  verification); the `/_stcore/stream` endpoint answers upgrade requests.
+- **Rendering path** — the cloud runs the same `app/dashboard.py`
+  against the same Neon data whose output was asserted byte-level via
+  AppTest above (marker xs/values, missingness note, coverage split);
+  690 tests green excluding the macOS duplicate copies, ruff clean.
+
+What the CLI cannot do (documented so the gap is explicit, not
+implied): SCC now fronts anonymous sessions with the share.streamlit.io
+browser flow — health returns the static shell instead of `ok` for
+non-browser clients, and the websocket upgrade never completes
+(`101` without `Sec-WebSocket-Accept`, HTML body instead of frames; the
+official public 30-days app behaves identically from this network, so
+this is edge behavior, not app state). The final human-eye confirmation
+is opening the app in a browser: Country view defaults to BRA +
+account_ownership_pct — the chart must show five markers at the survey
+years listed above, with the missingness note beneath.
