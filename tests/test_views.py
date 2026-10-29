@@ -180,8 +180,8 @@ def test_client_briefing_run_gets_path() -> None:
 
 
 def test_client_briefing_timeout_nesting_holds() -> None:
-    # D11 invariant: the LLM default (90 s) < client briefing timeout
-    # (120 s); ordinary GETs keep the short default.
+    # D11 invariant: the LLM default (240 s) < client briefing timeout
+    # (300 s); ordinary GETs keep the short default.
     from macropulse.briefing import LLM_TIMEOUT_SECONDS
 
     assert LLM_TIMEOUT_SECONDS < BRIEFING_TIMEOUT

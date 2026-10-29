@@ -288,6 +288,56 @@ def test_prompt_mentions_missingness_rule() -> None:
     assert "missing" in prompt
 
 
+def test_prompt_v2_compresses_availability_to_indicator_summary() -> None:
+    # The llm-v2 trim: per-observation availability claims (91-93% of a
+    # panel-scale prompt, measured 2026-10-29) never travel verbatim;
+    # the summary names the distinct indicators instead, and the
+    # statement material stays exact.
+    facts = BriefingFacts.from_observations(
+        [
+            obs(),
+            obs(period="2024-01-01", value=None, missing_reason="series_gap"),
+            obs(period="2023-01-01", value=None, missing_reason="series_gap"),
+        ]
+    )
+    validated = [
+        c
+        for c, a in adjudicate_all(build_claims(facts), facts)
+        if a.validated
+    ]
+    availability = [c for c in validated if c.kind == "availability"]
+    assert len(availability) == 2  # the fixture really exercises the trim
+
+    prompt = build_prompt(facts, validated)
+    for claim in availability:
+        assert claim.text not in prompt  # no per-period wall
+    assert "gdp_real_growth" in prompt  # the summary names the indicator
+    for claim in validated:
+        if claim.kind in ("level", "change"):
+            assert claim.text in prompt  # statement material verbatim
+
+
+def test_prompt_v2_summary_does_not_grow_per_observation() -> None:
+    # Sixty missing periods across one indicator: the summary is
+    # per-indicator, so the prompt stays far smaller than the claims it
+    # compresses - the property that makes the cross-border LLM call fit
+    # inside its timeout.
+    many_missing = [
+        obs(period=f"{year}-01-01", value=None, missing_reason="series_gap")
+        for year in range(1960, 2020)
+    ]
+    facts = BriefingFacts.from_observations([obs(), *many_missing])
+    validated = [
+        c
+        for c, a in adjudicate_all(build_claims(facts), facts)
+        if a.validated
+    ]
+    prompt = build_prompt(facts, validated)
+    total_claim_chars = sum(len(c.text) for c in validated)
+    assert total_claim_chars > 4000  # the fixture really is panel-scale
+    assert len(prompt) < total_claim_chars // 4
+
+
 # --- HTTP path ------------------------------------------------------------------
 
 

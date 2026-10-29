@@ -47,21 +47,25 @@ from macropulse.briefing.claims import Claim
 from macropulse.briefing.facts import BriefingFacts
 
 # Nested timeout budget (see plan D11): the LLM call must fail before the
-# dashboard-side client timeout (views/client.py BRIEFING_TIMEOUT, 120 s)
+# dashboard-side client timeout (views/client.py BRIEFING_TIMEOUT, 300 s)
 # so the deterministic fallback still renders inside the API request.
-# Default sized against the real panel-scale prompt (~20 K tokens,
-# 19-32 s generations measured from the best-case network 2026-10-29;
-# the cross-border cloud path needs headroom past that). Per-deployment
-# override: the LLM_TIMEOUT_SECONDS environment variable, read at call
-# time like every other LLM_* key.
-LLM_TIMEOUT_SECONDS = 90.0
+# Default sized against the real cross-border cloud path: 45 s and 90 s
+# both timed out from the US-hosted cloud runtime to the project's
+# Beijing endpoint (fallback runs observed live 2026-10-29), and the
+# llm-v2 prompt trim cuts the prefill ~90% but cannot bound a slow
+# network's decode. 240 s leaves headroom under the 600 s override cap.
+# Per-deployment override: the LLM_TIMEOUT_SECONDS environment variable,
+# read at call time like every other LLM_* key.
+LLM_TIMEOUT_SECONDS = 240.0
 
 # Sanity bounds for the environment override, in seconds.
 LLM_TIMEOUT_MIN = 1.0
 LLM_TIMEOUT_MAX = 600.0
 
-# Recorded in briefing_runs.prompt_version (String(32)).
-LLM_PROMPT_VERSION = "llm-v1"
+# Recorded in briefing_runs.prompt_version (String(32)). v2: the prompt
+# carries statement claims verbatim and compresses the per-observation
+# availability claims to a per-indicator summary (see build_prompt).
+LLM_PROMPT_VERSION = "llm-v2"
 
 # Closed vocabulary of supported wire formats.
 SUPPORTED_PROVIDERS = ("openai-compatible",)
@@ -222,22 +226,46 @@ def build_system_prompt() -> str:
 
 
 def build_prompt(facts: BriefingFacts, validated_claims: list[Claim]) -> str:
-    """The user message: validated claim texts verbatim, nothing else.
+    """The user message (llm-v2): statement claims verbatim, missingness
+    compressed to a per-indicator summary.
 
-    The LLM sees only what a statement may be derived from - the
-    validated claims (exact values, units, periods, citations) plus the
-    partition counts it must not contradict. Raw rows, excluded
+    The LLM sees only what a statement may be derived from. At panel
+    scale the measured split (2026-10-29) is 91-93% availability claims -
+    one ~180-char line per recorded missing observation, ~16 K prompt
+    tokens per country - none of it statement material, since the LLM
+    may never state a missing value anyway. v2 therefore keeps the
+    level/change claims verbatim (the only statement sources, cited
+    exactly) and compresses the availability claims to the distinct
+    indicators they cover, with the missingness rules inline. The
+    numeric-fidelity gate is unaffected: it checks the prose against ALL
+    validated claims, not against the prompt. Raw rows, excluded
     observations' values, and anything unvalidated never appear.
     """
+    statements = [
+        c for c in validated_claims if c.kind in ("level", "change")
+    ]
+    availability = [c for c in validated_claims if c.kind == "availability"]
+
     lines: list[str] = []
     lines.append(
         "Draft the statements section for a single-country briefing from "
         "these validated claims only:"
     )
     lines.append("")
-    for claim in validated_claims:
+    for claim in statements:
         lines.append(f"[{claim.kind}] {claim.text}")
     lines.append("")
+    if availability:
+        missing_ids = sorted({c.indicator_id for c in availability})
+        summary = "; ".join(
+            f"{facts.indicator_label(i)} [{i}]" for i in missing_ids
+        )
+        lines.append(
+            "Recorded missing - name the missingness in general terms "
+            "only, never a value, never an enumeration of periods or "
+            f"counts: {summary}."
+        )
+        lines.append("")
     lines.append(
         f"Partition context (do not restate as counts): "
         f"{len(facts.facts)} validated observation(s), "
@@ -245,11 +273,6 @@ def build_prompt(facts: BriefingFacts, validated_claims: list[Claim]) -> str:
         f"{len(facts.excluded)} excluded (not real evidence - never state "
         "them as observed)."
     )
-    if facts.missing:
-        lines.append(
-            "Missing observations are covered by the availability claims "
-            "above; name the missingness, never a value."
-        )
     return "\n".join(lines)
 
 

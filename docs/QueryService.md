@@ -114,7 +114,7 @@ LLM failure is not an HTTP error; it is a fallback:
 
 ```json
 {
-  "id": 12, "created_at": "...", "model": "gpt-...", "prompt_version": "llm-v1",
+  "id": 12, "created_at": "...", "model": "gpt-...", "prompt_version": "llm-v2",
   "status": "completed", "claims": [{"claim_text": "...", "evidence_refs": [...], "validated": true}],
   "country_iso3": "USA", "prose": "MacroPulse structured briefing\n...",
   "used_llm": true, "warning": null

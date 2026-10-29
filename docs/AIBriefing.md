@@ -87,19 +87,22 @@ machine computes; the prose reports.
   only — never the key.
 - **Read timeout (`LLM_TIMEOUT_SECONDS`)** — the `/chat/completions`
   read timeout, overridable per deployment; unset it defaults to
-  `90 s`, and the value is validated against
+  `240 s`, and the value is validated against
   [`LLM_TIMEOUT_MIN`, `LLM_TIMEOUT_MAX`] = [1, 600] s (a non-numeric or
   out-of-range value is a typed config error → fallback, never a silent
-  clamp). Sized against the real panel-scale prompt: ~20 K tokens with
-  ~1.9 K-token completions measured 19–32 s from the best-case network,
-  and the cross-border cloud path (US runtime → the project's Beijing
-  endpoint) needs headroom past that — the earlier 45 s default timed
-  out there and rendered the honest `llm_transport_error` fallback. It
-  is nested inside the dashboard client's `120 s` (`BRIEFING_TIMEOUT`),
-  so the LLM fails first and the fallback still renders inside the
-  request; `tests/test_views.py` asserts `LLM_TIMEOUT_SECONDS <
-  BRIEFING_TIMEOUT`. On cloud hosts the key is bridged from `st.secrets`
-  like the other `LLM_*` vars.
+  clamp). Sized against the real cross-border cloud path (US runtime →
+  the project's Beijing endpoint): both earlier defaults timed out
+  there in live service (45 s on 2026-10-28, 90 s on 2026-10-29, each
+  rendering the honest `llm_transport_error` fallback), while the same
+  calls measured 19–35 s from the best-case network — a non-streaming
+  completion must fit entirely inside one read window, and the
+  trans-Pacific path inflates it past any tight cap. It is nested
+  inside the dashboard client's `300 s` (`BRIEFING_TIMEOUT`), so the
+  LLM fails first and the fallback still renders inside the request;
+  `tests/test_views.py` asserts `LLM_TIMEOUT_SECONDS <
+  BRIEFING_TIMEOUT`. On the cloud host that client hop is in-process
+  (loopback), so no external proxy shortens the wait. On cloud hosts
+  the key is bridged from `st.secrets` like the other `LLM_*` vars.
 - **Provider interop (`LLM_EXTRA_BODY`)** — an optional JSON object
   merged UNDER the fixed request keys (`model`, `messages`,
   `temperature` always win; malformed JSON is a typed config error →
@@ -110,11 +113,19 @@ machine computes; the prose reports.
   `LLM_EXTRA_BODY={"enable_thinking": false}`. Unset, the body is
   exactly the OpenAI-compatible minimum, so strict endpoints keep
   working.
-- **Prompt** — built ONLY from validated claim texts and partition
-  counts (`build_prompt`): the LLM never sees raw rows, excluded
-  observations' values, or anything unvalidated. The system prompt
-  requires exact copying of numbers/units/periods/citations and forbids
-  the four banned phrase classes, forecasts, advice, and scope counts.
+- **Prompt (`llm-v2`)** — built ONLY from validated claims and
+  partition counts (`build_prompt`): the LLM never sees raw rows,
+  excluded observations' values, or anything unvalidated. The v2 trim
+  (2026-10-29): level/change claims travel verbatim (the only statement
+  material), while the per-observation availability claims — measured
+  91–93% of a panel-scale prompt, ~16 K tokens per country — are
+  compressed to a per-indicator recorded-missing summary with the
+  no-value/no-enumeration rules inline. The numeric-fidelity gate is
+  unchanged: it checks the prose against ALL validated claims, not
+  against the prompt, so the trim narrows what the LLM may say, never
+  what the gate allows. The system prompt requires exact copying of
+  numbers/units/periods/citations and forbids the four banned phrase
+  classes, forecasts, advice, and scope counts.
 - **Three gates on the draft** — (1) the adjudication-derived prompt is
   the only input (unchanged from S16); (2) `check_prose` (banned
   phrases); (3) `check_numeric_fidelity` — every numeric token in the
@@ -141,7 +152,7 @@ machine computes; the prose reports.
 
 - **Provenance** — every attempt appends a `briefing_runs` row: `model`
   (the LLM's id or `deterministic-template`), `prompt_version`
-  (`llm-v1` or `s16-v1`), `status` (`completed` / `fallback`), plus the
+  (`llm-v2` or `s16-v1`), `status` (`completed` / `fallback`), plus the
   full adjudicated-claim trail. Append-only: nothing is updated or
   deleted.
 - **Endpoints** — `POST /briefing {"country_iso3": "USA"}` generates on
