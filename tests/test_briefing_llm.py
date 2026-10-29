@@ -256,6 +256,32 @@ def test_system_prompt_states_the_four_bans() -> None:
         assert fragment in system
 
 
+def test_prompt_version_is_v3() -> None:
+    assert LLM_PROMPT_VERSION == "llm-v3"
+
+
+def test_system_prompt_requires_the_two_section_draft() -> None:
+    system = build_system_prompt()
+    # The v3 contract: exactly two sections, in order...
+    assert "'## Overview'" in system
+    assert "'## Statements'" in system
+    assert system.index("'## Overview'") < system.index("'## Statements'")
+    # ...and every machine-frame heading explicitly forbidden.
+    for name in ("Headlines", "Key figures", "Availability", "Limitations", "Scope"):
+        assert name in system
+
+
+def test_prompt_first_line_names_the_v3_task() -> None:
+    facts = BriefingFacts.from_observations([obs()])
+    validated = [
+        c for c, a in adjudicate_all(build_claims(facts), facts) if a.validated
+    ]
+    prompt = build_prompt(facts, validated)
+    assert prompt.startswith(
+        "Draft the '## Overview' and '## Statements' sections"
+    )
+
+
 def test_prompt_carries_validated_claims_only() -> None:
     facts = BriefingFacts.from_observations(
         [obs(period="2024-01-01", value=2.8), obs()]

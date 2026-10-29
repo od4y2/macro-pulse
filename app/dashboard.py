@@ -41,6 +41,7 @@ except ImportError:
 else:
     boot()
 
+from macropulse.briefing.prose import display_value
 from macropulse.case_study.macro_episodes import MACRO_EPISODES
 from macropulse.catalog import CATALOG
 from macropulse.views.annotations import (
@@ -50,6 +51,7 @@ from macropulse.views.annotations import (
     episodes_in_range,
 )
 from macropulse.views.assembly import (
+    briefing_highlights,
     chart_traces,
     comparison_matrix,
     country_view_rows,
@@ -585,6 +587,12 @@ with tab_briefing:
             "(nothing here is cached or replayed)."
         )
     else:
+        result_iso3 = result.get("country_iso3")
+        if result_iso3 != briefing_iso3:
+            st.warning(
+                f"Showing the last generated briefing for {result_iso3} - "
+                f"press **Generate briefing** to run {briefing_iso3}."
+            )
         if result.get("warning"):
             st.warning(
                 f"Served by the deterministic fallback - {result['warning']}"
@@ -593,8 +601,77 @@ with tab_briefing:
         st.caption(
             f"model: {result.get('model')} · prompt: "
             f"{result.get('prompt_version')} · status: {result.get('status')} "
-            f"· run #{result.get('id')} · country: {result.get('country_iso3')}"
+            f"· run #{result.get('id')} · country: {result_iso3}"
         )
+
+        # Headline tiles + small multiples, from the same latest-vintage
+        # rows the briefing generation used (cached fetch, pure shaping in
+        # views.assembly - no value is computed, converted, or zero-filled).
+        try:
+            tile_obs = fetch_latest(API_URL, None, result_iso3)
+        except QueryServiceError as exc:
+            tile_obs = []
+            st.caption(f"Could not load observations for the visuals: {exc}")
+        highlights = briefing_highlights(tile_obs)
+        if highlights:
+            st.subheader("Headline figures")
+            for row_start in range(0, len(highlights), 4):
+                cols = st.columns(4)
+                for col, h in zip(cols, highlights[row_start : row_start + 4]):
+                    with col:
+                        st.metric(
+                            indicator_labels.get(h["indicator_id"], h["indicator_id"]),
+                            f"{display_value(h['value'])} {h['unit']}",
+                        )
+                        # No st.metric delta: Streamlit draws an arrow glyph
+                        # for ANY text delta, and a directionless "from 2.8"
+                        # would wear an up-arrow. Direction (house wording),
+                        # rounded prior, and prior period go in the caption.
+                        if h["direction"] is not None:
+                            st.caption(
+                                f"{h['period']} · {h['direction']} from "
+                                f"{display_value(h['prior_value'])} "
+                                f"({h['prior_period']})"
+                            )
+                        else:
+                            st.caption(f"{h['period']} · no consecutive prior period")
+            st.caption(
+                "Tiles rounded for display (2 decimals); latest-vintage "
+                "real-evidence observations exactly as served. A prior is "
+                "shown only when the two periods are exactly one frequency "
+                "step apart - no comparison across gaps, matching the "
+                "briefing's change-claim rule."
+            )
+
+            st.subheader("Indicator trends")
+            chart_cols = st.columns(2)
+            for i, h in enumerate(highlights):
+                with chart_cols[i % 2]:
+                    obs_i = fetch_latest(API_URL, h["indicator_id"], result_iso3)
+                    traces = chart_traces(obs_i, [result_iso3])
+                    if traces:
+                        st.plotly_chart(
+                            line_chart(
+                                traces,
+                                indicator_labels.get(
+                                    h["indicator_id"], h["indicator_id"]
+                                ),
+                                traces[0]["unit"],
+                                focus=result_iso3,
+                            ),
+                            width="stretch",
+                            # Unique per indicator: a loop of plotly_chart
+                            # elements with identical auto-generated IDs is a
+                            # StreamlitDuplicateElementId error.
+                            key=f"briefing-trend-{h['indicator_id']}",
+                        )
+            st.caption(
+                "One chart per indicator: the full latest-vintage series for "
+                "this country. Gaps stay gaps (never interpolated, never "
+                "zero-filled); provenance on hover; documented episodes as "
+                "neutral bands."
+            )
+
         with st.expander("Adjudicated claims"):
             st.dataframe(
                 [

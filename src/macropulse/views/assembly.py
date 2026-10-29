@@ -21,6 +21,8 @@ Governance carried into display structures:
 
 from __future__ import annotations
 
+from macropulse.briefing.claims import consecutive_periods
+
 MISSING = "missing"
 
 
@@ -179,6 +181,68 @@ def isolated_point_indices(xs: list, ys: list) -> list[int]:
         if not prev_observed and not next_observed:
             indices.append(i)
     return indices
+
+
+def briefing_highlights(observations: list[dict]) -> list[dict]:
+    """Headline tile data for the briefing tab: latest value per indicator.
+
+    Input is the client's ``observations(..., latest_vintage=True)``
+    payload for one country. Only rows a briefing statement could cite
+    are considered (``evidence_label == "real"`` with a value); anything
+    else - missing rows, excluded evidence - never reaches a tile.
+
+    Per indicator the latest observed period becomes the tile; a prior
+    value (and therefore a direction) is carried ONLY when the two
+    periods are exactly one frequency step apart, via the briefing
+    layer's ``consecutive_periods`` - the same no-comparison-across-gaps
+    rule the change claims honor, so a tile never implies a trend the
+    claims would refuse to state. Values stay raw; rounding is a
+    render-time decision (``briefing.prose.display_value``). Nothing is
+    zero-filled, computed, or imputed. Sorted by indicator_id -
+    deterministic, never merit-based.
+    """
+    usable = [
+        o
+        for o in observations
+        if o["evidence_label"] == "real" and o["value"] is not None
+    ]
+    by_indicator: dict[str, list[dict]] = {}
+    for o in usable:
+        by_indicator.setdefault(o["indicator_id"], []).append(o)
+
+    highlights = []
+    for indicator_id in sorted(by_indicator):
+        series = sorted(by_indicator[indicator_id], key=lambda o: o["period"])
+        latest = series[-1]
+        prior_period: str | None = None
+        prior_value: float | None = None
+        direction: str | None = None
+        if len(series) >= 2:
+            candidate = series[-2]
+            if consecutive_periods(
+                candidate["period"], latest["period"], latest["frequency"]
+            ):
+                prior_period = candidate["period"]
+                prior_value = candidate["value"]
+                direction = (
+                    "up"
+                    if latest["value"] > prior_value
+                    else "down"
+                    if latest["value"] < prior_value
+                    else "unchanged"
+                )
+        highlights.append(
+            {
+                "indicator_id": indicator_id,
+                "unit": latest["unit"],
+                "period": latest["period"],
+                "value": latest["value"],
+                "prior_period": prior_period,
+                "prior_value": prior_value,
+                "direction": direction,
+            }
+        )
+    return highlights
 
 
 def coverage_counts(observations: list[dict], country_order: list[str]) -> list[dict]:

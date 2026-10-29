@@ -65,7 +65,11 @@ LLM_TIMEOUT_MAX = 600.0
 # Recorded in briefing_runs.prompt_version (String(32)). v2: the prompt
 # carries statement claims verbatim and compresses the per-observation
 # availability claims to a per-indicator summary (see build_prompt).
-LLM_PROMPT_VERSION = "llm-v2"
+# v3 (2026-10-29 readability redesign): the draft must open with a
+# short "## Overview" section followed by "## Statements" - the machine
+# frame (Headlines, Key figures, Availability, Limitations) is composed
+# around it, and the draft is forbidden from emitting frame headings.
+LLM_PROMPT_VERSION = "llm-v3"
 
 # Closed vocabulary of supported wire formats.
 SUPPORTED_PROVIDERS = ("openai-compatible",)
@@ -204,14 +208,24 @@ def _parse_timeout(raw: str) -> float:
 
 
 def build_system_prompt() -> str:
-    """Standing instructions for the LLM prose source."""
+    """Standing instructions for the LLM prose source (llm-v3)."""
     return (
-        "You write the statements section of a structured macroeconomic "
-        "briefing. Rules, enforced mechanically on your output:\n"
+        "You write two sections of a structured macroeconomic briefing: "
+        "'## Overview' then '## Statements'. Rules, enforced mechanically "
+        "on your output:\n"
+        "- Structure: begin with the heading '## Overview' and write 2-3 "
+        "sentences summarizing the current picture in the validated "
+        "claims. Then write the heading '## Statements' and cover the "
+        "claims in short bullet points grouped by theme, with the "
+        "indicator name in bold at the start of each bullet.\n"
+        "- Emit ONLY those two headings. Never emit any other heading - "
+        "in particular never 'Headlines', 'Key figures', 'Availability', "
+        "'Limitations', 'Scope', or a document title; a machine-composed "
+        "frame carries those sections.\n"
         "- State ONLY what the provided validated claims state. Copy every "
         "number, unit, period, and source exactly as given - never "
         "round, convert, compute, or introduce any other number (writing "
-        "counts as words is safest).\n"
+        "counts as words is safest). This applies to the Overview too.\n"
         "- No causal phrasing (because, due to, driven by, leads to).\n"
         "- No investment advice or recommendations.\n"
         "- No forecasts or forward-looking statements (will rise, expected "
@@ -220,14 +234,15 @@ def build_system_prompt() -> str:
         "- Name missing observations as missing; never imply a value.\n"
         "- Do not state scope counts or totals; a machine-composed footer "
         "carries them.\n"
-        "- Plain markdown prose, no links, no headings, no tables. "
-        "Short paragraphs or bullet lists only."
+        "- Plain markdown, no links, no tables. Short paragraphs or "
+        "bullet lists only."
     )
 
 
 def build_prompt(facts: BriefingFacts, validated_claims: list[Claim]) -> str:
-    """The user message (llm-v2): statement claims verbatim, missingness
-    compressed to a per-indicator summary.
+    """The user message: statement claims verbatim, missingness compressed
+    to a per-indicator summary (the llm-v2 trim; v3 changes only the
+    system prompt's draft structure).
 
     The LLM sees only what a statement may be derived from. At panel
     scale the measured split (2026-10-29) is 91-93% availability claims -
@@ -248,8 +263,8 @@ def build_prompt(facts: BriefingFacts, validated_claims: list[Claim]) -> str:
 
     lines: list[str] = []
     lines.append(
-        "Draft the statements section for a single-country briefing from "
-        "these validated claims only:"
+        "Draft the '## Overview' and '## Statements' sections for a "
+        "single-country briefing from these validated claims only:"
     )
     lines.append("")
     for claim in statements:

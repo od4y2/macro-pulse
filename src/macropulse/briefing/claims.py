@@ -131,11 +131,14 @@ def _months_between(prior: str, current: str) -> int:
     return (b.year - a.year) * 12 + (b.month - a.month)
 
 
-def _consecutive(prior: str, current: str, frequency: str) -> bool:
+def consecutive_periods(prior: str, current: str, frequency: str) -> bool:
     """True when the two periods are exactly one frequency step apart.
 
     Change claims are only built for consecutive observed periods: a
     "rose from" sentence across a gap would mislead about timing.
+    Public because the presentation layer (views.assembly
+    ``briefing_highlights``) must honor the same rule - a tile delta
+    across a gap would mislead exactly like a claim would.
     """
     if frequency not in FREQUENCY_STEP_MONTHS:
         raise ValueError(
@@ -218,7 +221,7 @@ def build_claims(facts: BriefingFacts) -> list[Claim]:
         )
         if len(series) >= 2:
             prior = series[-2]
-            if _consecutive(prior.period, current.period, current.frequency):
+            if consecutive_periods(prior.period, current.period, current.frequency):
                 claims.append(
                     ChangeClaim(
                         text=_change_text(facts, prior, current),

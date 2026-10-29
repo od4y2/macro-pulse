@@ -114,9 +114,9 @@ LLM failure is not an HTTP error; it is a fallback:
 
 ```json
 {
-  "id": 12, "created_at": "...", "model": "gpt-...", "prompt_version": "llm-v2",
+  "id": 12, "created_at": "...", "model": "gpt-...", "prompt_version": "llm-v3",
   "status": "completed", "claims": [{"claim_text": "...", "evidence_refs": [...], "validated": true}],
-  "country_iso3": "USA", "prose": "MacroPulse structured briefing\n...",
+  "country_iso3": "USA", "prose": "# MacroPulse briefing — United States (USA)\n\nScope: ...\n\n## Headlines\n...",
   "used_llm": true, "warning": null
 }
 ```
@@ -125,7 +125,8 @@ On fallback: `status="fallback"`, `model="deterministic-template"`,
 `prompt_version="s16-v1"`, `used_llm=false`, and `warning` names the
 reason from the closed vocabulary (`llm_not_configured`,
 `llm_transport_error`, `llm_response_error`, `banned_phrase`,
-`fabricated_number`, `empty_llm_prose`, `no_validated_statements`).
+`fabricated_number`, `frame_conflict`, `empty_llm_prose`,
+`no_validated_statements`).
 Every attempt appends a `briefing_runs` row (append-only audit); the
 response `id` is that row. `evidence_refs` are full fact references
 (indicator, country, period, vintage, source system/code) — provenance

@@ -13,16 +13,22 @@ import pytest
 from macropulse.briefing import (
     DETERMINISTIC_MODEL,
     DETERMINISTIC_PROMPT_VERSION,
+    ROUNDING_NOTE,
     BriefingFacts,
     adjudicate,
     adjudicate_all,
+    availability_summary_lines,
     build_claims,
+    check_frame_conflict,
     check_numeric_fidelity,
     check_prose,
+    display_value,
+    key_figures_table,
     numeric_tokens,
     record_briefing_run,
     render_briefing,
     render_rejection_report,
+    title_line,
 )
 from macropulse.briefing.claims import CLAIM_KINDS, REJECTION_REASONS
 from macropulse.briefing.facts import ExcludedObservation
@@ -386,6 +392,235 @@ def test_render_empty_facts() -> None:
     assert "0 economies, 0 indicator(s)" in doc
     assert "No validated value statements." in doc
     assert "No missing observations in the served set." in doc
+    # No entries -> no Key figures table header, no rounding note.
+    assert "| Indicator |" not in doc
+    assert ROUNDING_NOTE not in doc
+
+
+def test_render_section_order_and_no_rst_rules() -> None:
+    facts = BriefingFacts.from_observations(
+        [obs(period="2024-01-01", value=2.8), obs()]
+    )
+    doc = render_briefing(facts, adjudicate_all(build_claims(facts), facts), "BRA")
+    assert doc.startswith("# MacroPulse briefing — Brazil (BRA)")
+    for earlier, later in (
+        ("## Headlines", "## Key figures"),
+        ("## Key figures", "## Statements"),
+        ("## Statements", "## Availability"),
+        ("## Availability", "## Limitations"),
+    ):
+        assert doc.index(earlier) < doc.index(later)
+    # The rounding note sits under the Key figures table, above Statements.
+    assert doc.index("## Key figures") < doc.index(ROUNDING_NOTE)
+    assert doc.index(ROUNDING_NOTE) < doc.index("## Statements")
+    # Markdown only - no reST-style section rules.
+    assert "=====" not in doc
+    assert "----------" not in doc
+
+
+def test_render_full_precision_only_in_statements() -> None:
+    facts = BriefingFacts.from_observations(
+        [
+            obs(period="2024-01-01", value=2.8123456),
+            obs(value=2.9123456),
+        ]
+    )
+    doc = render_briefing(facts, adjudicate_all(build_claims(facts), facts))
+    head, statements = doc.split("## Statements")
+    # The frame rounds; Statements carry the served precision verbatim.
+    assert "2.9123456" not in head
+    assert "**2.91**" in head
+    assert "up from **2.81**" in head
+    assert "2.9123456" in statements
+    assert "2.8123456" in statements
+
+
+def test_key_figures_row_shape() -> None:
+    facts = BriefingFacts.from_observations(
+        [obs(period="2024-01-01", value=2.8), obs()]
+    )
+    validated = [
+        c
+        for c, a in adjudicate_all(build_claims(facts), facts)
+        if a.validated
+    ]
+    table = "\n".join(key_figures_table(facts, validated))
+    assert "| Indicator | Latest period | Value | Change | Source |" in table
+    assert "| gdp_real_growth | 2025-01-01 | **2.9** percent_per_year " in table
+    assert "up from **2.8** (2024-01-01)" in table
+    assert "world_bank NY.GDP.MKTP.KD.ZG" in table
+
+
+def test_key_figures_level_only_names_the_absent_comparison() -> None:
+    facts = BriefingFacts.from_observations([obs()])
+    validated = [
+        c
+        for c, a in adjudicate_all(build_claims(facts), facts)
+        if a.validated
+    ]
+    table = "\n".join(key_figures_table(facts, validated))
+    assert "no consecutive prior period" in table
+    assert "up from" not in table
+
+
+def test_key_figures_multi_country_gains_economy_column() -> None:
+    facts = BriefingFacts.from_observations(
+        [obs(), obs(country_iso3="ZAF", value=0.7)]
+    )
+    validated = [
+        c
+        for c, a in adjudicate_all(build_claims(facts), facts)
+        if a.validated
+    ]
+    table = "\n".join(key_figures_table(facts, validated))
+    assert "| Economy | Indicator |" in table
+    assert "| BRA | gdp_real_growth |" in table
+    assert "| ZAF | gdp_real_growth |" in table
+
+
+def test_key_figures_escapes_pipes_in_indicator_names() -> None:
+    facts = BriefingFacts.from_observations(
+        [obs()], indicator_names={"gdp_real_growth": "GDP | growth"}
+    )
+    validated = [
+        c
+        for c, a in adjudicate_all(build_claims(facts), facts)
+        if a.validated
+    ]
+    table = "\n".join(key_figures_table(facts, validated))
+    assert "GDP \\| growth [gdp_real_growth]" in table
+
+
+def test_headlines_capped_at_four_bullets() -> None:
+    facts = BriefingFacts.from_observations(
+        [obs(indicator_id=f"ind_{i}", value=float(i)) for i in range(6)]
+    )
+    validated = [
+        c
+        for c, a in adjudicate_all(build_claims(facts), facts)
+        if a.validated
+    ]
+    doc = render_briefing(facts, adjudicate_all(build_claims(facts), facts))
+    headlines = doc.split("## Headlines")[1].split("## Key figures")[0]
+    assert len([ln for ln in headlines.splitlines() if ln.startswith("- **")]) == 4
+    # The table below stays exhaustive.
+    table = "\n".join(key_figures_table(facts, validated))
+    assert len([ln for ln in table.splitlines() if ln.startswith("| ind_")]) == 6
+
+
+def test_availability_compacted_to_per_indicator_counts() -> None:
+    facts = BriefingFacts.from_observations(
+        [
+            obs(),
+            obs(period="2024-01-01", value=None, missing_reason="series_gap"),
+            obs(period="2023-01-01", value=None, missing_reason="series_gap"),
+            obs(
+                indicator_id="cpi_inflation_pct",
+                period="2024-01-01",
+                value=None,
+                missing_reason="not_observed_at_period",
+            ),
+        ]
+    )
+    adjudicated = adjudicate_all(build_claims(facts), facts)
+    validated = [c for c, a in adjudicated if a.validated]
+    summary = availability_summary_lines(facts, validated)
+    # 3 missing over 2 indicators -> 2 count bullets + the audit pointer.
+    assert len(summary) == 3
+    assert any(
+        "gdp_real_growth: 2 observation(s) recorded missing "
+        "(reasons: series_gap)." in line
+        for line in summary
+    )
+    assert any(
+        "cpi_inflation_pct: 1 observation(s) recorded missing "
+        "(reasons: not_observed_at_period)." in line
+        for line in summary
+    )
+    assert any("audit trail" in line for line in summary)
+    doc = render_briefing(facts, adjudicated)
+    # The per-observation wall is gone from the document...
+    assert "No observation recorded for" not in doc
+    # ...but missingness is still summarized honestly, with a pointer
+    # from the Headlines block.
+    assert "Recorded missing: 3 observation(s) across 2 indicator(s)" in doc
+    # The scope line interpolates every count (regression: a dropped
+    # f-prefix once rendered the placeholder literally).
+    assert "3 recorded missing." in doc
+    assert "{len(" not in doc
+
+
+def test_title_line_names_countries_and_falls_back_to_the_iso3() -> None:
+    empty = BriefingFacts.from_observations([])
+    assert title_line(empty) == "# MacroPulse briefing"
+    facts = BriefingFacts.from_observations([obs(country_iso3="XYZ")])
+    # An iso3 off the panel renders as itself - never a fabricated name.
+    assert title_line(facts) == "# MacroPulse briefing — XYZ"
+    # An explicit iso3 wins and resolves through the panel names.
+    assert title_line(facts, "DEU") == "# MacroPulse briefing — Germany (DEU)"
+    multi = BriefingFacts.from_observations(
+        [obs(country_iso3="BRA"), obs(country_iso3="ZAF")]
+    )
+    assert title_line(multi) == "# MacroPulse briefing — Brazil, South Africa"
+
+
+# --- display rounding (frame presentation, never a restatement of the record) ---
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (2.9, "2.9"),
+        (2.0, "2"),
+        (100.0, "100"),
+        (-1.5, "-1.5"),
+        (98.30, "98.3"),
+        (2.123456789, "2.12"),
+        (2.125, "2.13"),  # ROUND_HALF_UP, not banker's rounding ("2.12")
+        (2.675, "2.68"),  # the binary-float trap round() gets wrong
+        (0.004, "<0.01"),  # nonzero never flattens to a fabricated zero
+        (-0.004, ">-0.01"),
+        (0.0, "0"),
+    ],
+)
+def test_display_value(value: float, expected: str) -> None:
+    assert display_value(value) == expected
+
+
+def test_display_value_survives_extremes() -> None:
+    # Huge floats quantize without sci-notation and without crashing
+    # (Decimal over repr keeps 1e30 exact as 10**30, not int(1e30)).
+    assert display_value(1e30) == "1" + "0" * 30
+    assert display_value(float("inf")) == "inf"  # repr, not a quantize crash
+
+
+# --- frame-conflict guard (llm-v3 draft structure) --------------------------------
+
+
+def test_check_frame_conflict_accepts_the_v3_shape() -> None:
+    assert check_frame_conflict("## Overview\nText.\n\n## Statements\n- More.") == []
+    # Heading comparison is case-insensitive.
+    assert check_frame_conflict("## overview\nT\n\n## STATEMENTS\n- M") == []
+    # Inline mentions of frame words are prose, not headings.
+    draft = (
+        "## Overview\nThe key figures and limitations below are scope.\n\n"
+        "## Statements\n- Headlines are machine-composed."
+    )
+    assert check_frame_conflict(draft) == []
+
+
+def test_check_frame_conflict_reports_missing_and_forbidden() -> None:
+    assert check_frame_conflict("## Statements\n- x") == [
+        "missing_heading: Overview"
+    ]
+    issues = check_frame_conflict(
+        "## Overview\nT\n\n## Statements\n- x\n\n## Limitations\n- none"
+    )
+    assert "frame_heading: limitations" in issues
+    assert check_frame_conflict("Plain prose, no headings at all.") == [
+        "missing_heading: Overview",
+        "missing_heading: Statements",
+    ]
 
 
 def test_excluded_observation_shape() -> None:

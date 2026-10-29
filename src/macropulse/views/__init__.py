@@ -9,6 +9,7 @@ Public surface:
 """
 
 from macropulse.views.assembly import (
+    briefing_highlights,
     chart_traces,
     comparison_matrix,
     country_view_rows,
@@ -41,6 +42,7 @@ __all__ = [
     "QUALITY_BADGES",
     "QueryServiceClient",
     "QueryServiceError",
+    "briefing_highlights",
     "chart_caption",
     "chart_traces",
     "comparison_matrix",

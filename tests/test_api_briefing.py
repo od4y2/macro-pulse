@@ -21,9 +21,16 @@ from macropulse.api.main import create_app
 from macropulse.briefing import DETERMINISTIC_MODEL, LLMTransportError
 from macropulse.db.models import Country, NormalizedObservation
 
+# llm-v3 draft shape: exactly '## Overview' + '## Statements', only
+# claim-backed numbers, no banned phrases, no machine-frame headings.
 CLEAN_PROSE = (
-    "Real GDP growth for USA stood at 2.9 percent_per_year in "
-    "2025-01-01, up from 2.8 in 2024-01-01."
+    "## Overview\n"
+    "Real GDP growth for USA was 2.9 percent_per_year in 2025-01-01, "
+    "up from 2.8 in 2024-01-01.\n"
+    "\n"
+    "## Statements\n"
+    "- **Real GDP growth [gdp_real_growth]**: 2.9 percent_per_year in "
+    "2025-01-01, up from 2.8 in 2024-01-01 (world_bank NY.GDP.MKTP.KD.ZG)."
 )
 
 
@@ -126,8 +133,9 @@ def test_post_briefing_llm_success(session, seeded_real) -> None:
     assert body["prompt_version"] == "llm-v1"
     assert body["country_iso3"] == "USA"
     assert CLEAN_PROSE in body["prose"]
-    assert body["prose"].startswith("MacroPulse structured briefing")
-    assert "Limitations" in body["prose"]  # the machine frame is present
+    assert body["prose"].startswith("# MacroPulse briefing — United States (USA)")
+    assert "## Headlines" in body["prose"]  # the machine frame is present
+    assert "Limitations" in body["prose"]
     assert fake.calls == 1
     # Audit trail: validated claims with full 6-field evidence refs.
     validated = [c for c in body["claims"] if c["validated"]]
@@ -156,7 +164,7 @@ def test_post_briefing_llm_failure_falls_back(session, seeded_real) -> None:
     assert body["model"] == DETERMINISTIC_MODEL
     assert body["prompt_version"] == "s16-v1"
     assert body["warning"].startswith("llm_transport_error:")
-    assert body["prose"].startswith("MacroPulse structured briefing")
+    assert body["prose"].startswith("# MacroPulse briefing — United States (USA)")
     assert "2.9" in body["prose"]  # the deterministic document still serves
 
 

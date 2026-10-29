@@ -16,19 +16,28 @@ from macropulse.briefing import (
     DETERMINISTIC_PROMPT_VERSION,
     FALLBACK_WARNINGS,
     LLM_PROMPT_VERSION,
+    ROUNDING_NOTE,
     BriefingOutcome,
     LLMResponseError,
     LLMTransportError,
+    check_prose,
     compose_document,
     generate_briefing,
 )
 from macropulse.db.models import BriefingRun
 
-# Prose that survives every gate: only claim-backed numbers, no banned
-# phrases ("2.9", "2.8", and the ISO periods all appear in the claims).
+# Prose that survives every gate: the llm-v3 draft shape (exactly
+# '## Overview' + '## Statements', no frame headings), only claim-backed
+# numbers, no banned phrases ("2.9", "2.8", and the ISO periods all
+# appear in the claims).
 CLEAN_PROSE = (
-    "Real GDP growth for BRA stood at 2.9 percent_per_year in "
-    "2025-01-01, up from 2.8 in 2024-01-01."
+    "## Overview\n"
+    "Real GDP growth for BRA was 2.9 percent_per_year in 2025-01-01, "
+    "up from 2.8 in 2024-01-01.\n"
+    "\n"
+    "## Statements\n"
+    "- **Real GDP growth [gdp_real_growth]**: 2.9 percent_per_year in "
+    "2025-01-01, up from 2.8 in 2024-01-01 (world_bank NY.GDP.MKTP.KD.ZG)."
 )
 
 
@@ -118,10 +127,19 @@ def test_llm_success_records_completed_run(session) -> None:
     assert outcome.model == "fake-llm"
     assert outcome.prompt_version == LLM_PROMPT_VERSION
     assert CLEAN_PROSE in outcome.prose
-    # The machine-composed frame carries the deterministic parts.
-    assert outcome.prose.startswith("MacroPulse structured briefing")
+    # The machine-composed frame carries the deterministic parts, in the
+    # documented section order (docs/AIBriefing.md).
+    assert outcome.prose.startswith("# MacroPulse briefing — Brazil (BRA)")
     assert "Scope:" in outcome.prose
-    assert "Limitations" in outcome.prose
+    for earlier, later in (
+        ("## Headlines", "## Key figures"),
+        ("## Key figures", "## Overview"),
+        ("## Overview", "## Statements"),
+        ("## Statements", "## Availability"),
+        ("## Availability", "## Limitations"),
+    ):
+        assert outcome.prose.index(earlier) < outcome.prose.index(later)
+    assert ROUNDING_NOTE in outcome.prose
     assert fake.calls == 1
     assert "2.9" in fake.prompts[0]  # prompt built from validated claims
 
@@ -137,11 +155,25 @@ def test_compose_document_frames_statements() -> None:
 
     facts = BriefingFacts.from_observations(obs_2y())
     adjudicated = adjudicate_all(build_claims(facts), facts)
-    document = compose_document("One statement.", facts, adjudicated)
-    statements_at = document.index("Statements")
-    limitations_at = document.index("Limitations")
-    assert statements_at < document.index("One statement.") < limitations_at
+    draft = (
+        "## Overview\n"
+        "Growth was 2.9 percent_per_year in 2025-01-01.\n"
+        "\n"
+        "## Statements\n"
+        "- One statement."
+    )
+    document = compose_document(draft, facts, adjudicated)
+    assert (
+        document.index("## Headlines")
+        < document.index("## Key figures")
+        < document.index("## Overview")
+        < document.index("One statement.")
+        < document.index("## Availability")
+        < document.index("## Limitations")
+    )
     assert "Scope: 1 economies" in document
+    # The frame's machine strings never trip the banned-phrase check.
+    assert check_prose(document) == []
 
 
 # --- the fallback matrix ----------------------------------------------------------
@@ -202,7 +234,7 @@ def test_unconfigured_env_falls_back(session, no_llm_env) -> None:
     assert outcome.used_llm is False
     assert outcome.warning is not None
     assert outcome.warning.startswith("llm_not_configured:")
-    assert outcome.prose.startswith("MacroPulse structured briefing")
+    assert outcome.prose.startswith("# MacroPulse briefing — Brazil (BRA)")
 
 
 def test_no_validated_claims_never_calls_the_llm(session) -> None:
@@ -284,13 +316,78 @@ def test_config_warning_names_variables_not_values(session, monkeypatch) -> None
 
 
 def test_every_fallback_warning_in_closed_vocabulary() -> None:
-    # Guard the docs contract: the seven reasons, exactly.
+    # Guard the docs contract: the eight reasons, exactly.
     assert FALLBACK_WARNINGS == (
         "llm_not_configured",
         "llm_transport_error",
         "llm_response_error",
         "banned_phrase",
         "fabricated_number",
+        "frame_conflict",
         "empty_llm_prose",
         "no_validated_statements",
     )
+
+
+# --- the frame gate (llm-v3 draft structure) ----------------------------------------
+
+
+def test_frame_heading_in_draft_falls_back(session) -> None:
+    # The draft must never echo a machine-frame heading - even clean,
+    # claim-backed prose is rejected when it does.
+    fake = FakeSource(CLEAN_PROSE + "\n\n## Limitations\n- None recorded.")
+    outcome = generate_briefing(session, "BRA", obs_2y(), llm_source=fake)
+    assert outcome.status == "fallback"
+    assert outcome.used_llm is False
+    assert outcome.warning is not None
+    assert outcome.warning.startswith("frame_conflict:")
+    assert "frame_heading: limitations" in outcome.warning
+    assert outcome.prose.startswith("# MacroPulse briefing")
+
+
+def test_missing_overview_heading_falls_back(session) -> None:
+    fake = FakeSource("## Statements\n- Growth was 2.9 in 2025-01-01.")
+    outcome = generate_briefing(session, "BRA", obs_2y(), llm_source=fake)
+    assert outcome.status == "fallback"
+    assert outcome.warning is not None
+    assert outcome.warning.startswith("frame_conflict:")
+    assert "missing_heading: Overview" in outcome.warning
+
+
+def test_banned_phrase_wins_over_frame_conflict(session) -> None:
+    # Integrity reasons beat structural ones: this draft has a banned
+    # phrase AND no required headings; the warning names the phrase.
+    fake = FakeSource("Growth reached 2.9 because of strong exports.")
+    outcome = generate_briefing(session, "BRA", obs_2y(), llm_source=fake)
+    assert outcome.status == "fallback"
+    assert outcome.warning is not None
+    assert outcome.warning.startswith("banned_phrase:")
+
+
+def test_fabricated_number_wins_over_frame_conflict(session) -> None:
+    fake = FakeSource("## Overview\nInflation hit 3.5.\n\n## Statements\n- X.")
+    outcome = generate_briefing(session, "BRA", obs_2y(), llm_source=fake)
+    assert outcome.status == "fallback"
+    assert outcome.warning is not None
+    assert outcome.warning.startswith("fabricated_number:")
+
+
+# --- both document paths pass the banned-phrase check --------------------------------
+
+
+def test_llm_path_document_passes_check_prose(session) -> None:
+    outcome = generate_briefing(session, "BRA", obs_2y(), llm_source=FakeSource())
+    assert outcome.status == "completed"
+    assert check_prose(outcome.prose) == []
+
+
+def test_fallback_document_passes_check_prose(session) -> None:
+    fake = FakeSource(exc=LLMTransportError("down"))
+    outcome = generate_briefing(session, "BRA", obs_2y(), llm_source=fake)
+    assert outcome.status == "fallback"
+    assert check_prose(outcome.prose) == []
+    # Same machine frame, minus the LLM-only Overview section.
+    assert "## Headlines" in outcome.prose
+    assert "## Key figures" in outcome.prose
+    assert ROUNDING_NOTE in outcome.prose
+    assert "## Overview" not in outcome.prose

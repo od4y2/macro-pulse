@@ -6,13 +6,14 @@ country's latest-vintage observations and tries the LLM prose source
 
     observations -> BriefingFacts -> build_claims -> adjudicate_all
                  -> [LLM prose] -> check_prose + check_numeric_fidelity
+                                   + check_frame_conflict
                  -> compose_document            (LLM path)
         or       -> render_briefing + warning   (deterministic fallback)
                  -> record_briefing_run         (audit row either way)
 
 The fallback is total: any configuration, transport, response,
-banned-phrase, or fabricated-number failure yields the deterministic
-template document, ``model="deterministic-template"``,
+banned-phrase, fabricated-number, or frame-structure failure yields the
+deterministic template document, ``model="deterministic-template"``,
 ``status="fallback"``, and a warning naming the reason. The LLM never
 gates the product - it only ever improves the prose that survives every
 rejection layer.
@@ -37,12 +38,13 @@ from macropulse.briefing.llm import (
     build_prompt,
 )
 from macropulse.briefing.prose import (
-    DOCUMENT_TITLE,
+    availability_summary_lines,
+    check_frame_conflict,
     check_numeric_fidelity,
     check_prose,
+    frame_head_lines,
     limitation_lines,
     render_briefing,
-    scope_line,
 )
 from macropulse.briefing.run import (
     DETERMINISTIC_MODEL,
@@ -57,6 +59,7 @@ FALLBACK_WARNINGS = (
     "llm_response_error",
     "banned_phrase",
     "fabricated_number",
+    "frame_conflict",
     "empty_llm_prose",
     "no_validated_statements",
 )
@@ -81,28 +84,29 @@ def compose_document(
     statements: str,
     facts: BriefingFacts,
     adjudicated: list[tuple[Claim, Adjudication]],
+    country_iso3: str | None = None,
 ) -> str:
-    """The machine-composed frame around gated LLM statements (D7).
+    """The machine-composed frame around gated LLM prose (D7).
 
-    Header, scope counts, limitations, and the boundary line are
-    deterministic (built from the facts, exactly as ``render_briefing``
-    builds them); only the Statements section carries LLM prose, which
-    reached this point having passed adjudication-derived prompting,
-    ``check_prose``, and ``check_numeric_fidelity``.
+    Title, scope counts, Headlines, Key figures, Availability, and
+    Limitations are deterministic (built from validated claim fields and
+    the facts, exactly as ``render_briefing`` builds them); only the
+    Overview/Statements sections carry LLM prose, which reached this
+    point having passed adjudication-derived prompting, ``check_prose``,
+    and ``check_numeric_fidelity``. The draft is inserted as-is (it
+    carries its own ``## Overview`` / ``## Statements`` headers under
+    llm-v3); the frame never parses or rewrites it.
     """
+    validated = [c for c, a in adjudicated if a.validated]
     rejected = [(c, a) for c, a in adjudicated if not a.validated]
     lines: list[str] = []
-    lines.append(DOCUMENT_TITLE)
-    lines.append("=============================")
-    lines.append("")
-    lines.append(scope_line(facts))
-    lines.append("")
-    lines.append("Statements")
-    lines.append("----------")
+    lines.extend(frame_head_lines(facts, validated, country_iso3))
     lines.append(statements.strip())
     lines.append("")
-    lines.append("Limitations")
-    lines.append("-----------")
+    lines.append("## Availability")
+    lines.extend(availability_summary_lines(facts, validated))
+    lines.append("")
+    lines.append("## Limitations")
     lines.extend(limitation_lines(facts, rejected))
     return "\n".join(lines)
 
@@ -157,13 +161,13 @@ def generate_briefing(
     if not validated:
         # Nothing a statement may be derived from - the LLM is not even
         # called; the deterministic document names the empty scope.
-        prose = render_briefing(facts, adjudicated)
+        prose = render_briefing(facts, adjudicated, country_iso3)
         model, prompt_version = DETERMINISTIC_MODEL, DETERMINISTIC_PROMPT_VERSION
         status = "fallback"
         warning = "no_validated_statements"
     else:
         prose, model, prompt_version, status, used_llm, warning = _try_llm(
-            facts, validated, adjudicated, llm_source
+            facts, validated, adjudicated, llm_source, country_iso3
         )
 
     run_id = (
@@ -193,17 +197,21 @@ def _try_llm(
     validated: list[Claim],
     adjudicated: list[tuple[Claim, Adjudication]],
     llm_source: LlmSource | None,
+    country_iso3: str,
 ) -> tuple[str, str, str, Literal["completed", "fallback"], bool, str | None]:
     """The LLM path with every gate; returns the outcome fields.
 
     Gate order: configuration -> transport -> response shape ->
-    banned phrases -> numeric fidelity. The first failure wins and
-    produces the deterministic fallback plus the reason.
+    banned phrases -> numeric fidelity -> frame structure (llm-v3: the
+    draft must carry its own Overview/Statements headings and must not
+    echo a machine-frame heading). The first failure wins and produces
+    the deterministic fallback plus the reason; integrity reasons win
+    over structural ones.
     """
 
     def fallback(warning: str) -> tuple[str, str, str, Literal["fallback"], bool, str]:
         return (
-            render_briefing(facts, adjudicated),
+            render_briefing(facts, adjudicated, country_iso3),
             DETERMINISTIC_MODEL,
             DETERMINISTIC_PROMPT_VERSION,
             "fallback",
@@ -236,9 +244,14 @@ def _try_llm(
         quoted = ", ".join(fabricated[:5])
         suffix = ", ..." if len(fabricated) > 5 else ""
         return fallback(f"fabricated_number: {quoted}{suffix}")
+    frame_issues = check_frame_conflict(llm_prose)
+    if frame_issues:
+        quoted = ", ".join(frame_issues[:5])
+        suffix = ", ..." if len(frame_issues) > 5 else ""
+        return fallback(f"frame_conflict: {quoted}{suffix}")
 
     return (
-        compose_document(llm_prose, facts, adjudicated),
+        compose_document(llm_prose, facts, adjudicated, country_iso3),
         llm_source.model,
         llm_source.prompt_version,
         "completed",

@@ -14,6 +14,7 @@ import httpx
 import pytest
 
 from macropulse.views.assembly import (
+    briefing_highlights,
     chart_traces,
     comparison_matrix,
     country_view_rows,
@@ -461,6 +462,85 @@ def test_coverage_counts_empty_input() -> None:
             "last_observed": None,
         }
     ]
+
+
+# --- assembly: briefing headline highlights ---------------------------------------
+
+
+def test_briefing_highlights_latest_with_consecutive_prior() -> None:
+    rows = briefing_highlights(
+        [
+            obs(period="2022-01-01", value=1.9),
+            obs(period="2023-01-01", value=2.5),
+        ]
+    )
+    assert rows == [
+        {
+            "indicator_id": "gdp_real_growth",
+            "unit": "percent_per_year",
+            "period": "2023-01-01",
+            "value": 2.5,  # raw - rounding is a render-time decision
+            "prior_period": "2022-01-01",
+            "prior_value": 1.9,
+            "direction": "up",
+        }
+    ]
+
+
+def test_briefing_highlights_no_comparison_across_a_gap() -> None:
+    # 2021 -> 2023 is two annual steps: no prior, no direction - the same
+    # rule the briefing's change claims honor.
+    rows = briefing_highlights(
+        [
+            obs(period="2021-01-01", value=1.0),
+            obs(period="2023-01-01", value=2.5),
+        ]
+    )
+    assert rows[0]["period"] == "2023-01-01"
+    assert rows[0]["prior_period"] is None
+    assert rows[0]["prior_value"] is None
+    assert rows[0]["direction"] is None
+
+
+def test_briefing_highlights_skip_unusable_rows() -> None:
+    rows = briefing_highlights(
+        [
+            # A recorded missing row (value None) is not a tile value.
+            obs(
+                indicator_id="cpi_inflation_pct",
+                period="2023-01-01",
+                value=None,
+                missing_reason="series_gap",
+            ),
+            # Non-real evidence never reaches a tile, even with a value.
+            obs(
+                indicator_id="excluded_one",
+                period="2023-01-01",
+                value=9.9,
+                evidence_label="synthetic",
+            ),
+            obs(period="2023-01-01", value=2.5),
+        ]
+    )
+    assert [r["indicator_id"] for r in rows] == ["gdp_real_growth"]
+
+
+def test_briefing_highlights_directions_and_sorted_order() -> None:
+    rows = briefing_highlights(
+        [
+            obs(indicator_id="z_down", period="2022-01-01", value=3.0),
+            obs(indicator_id="z_down", period="2023-01-01", value=2.0),
+            obs(indicator_id="a_flat", period="2022-01-01", value=1.5),
+            obs(indicator_id="a_flat", period="2023-01-01", value=1.5),
+        ]
+    )
+    assert [r["indicator_id"] for r in rows] == ["a_flat", "z_down"]
+    assert rows[0]["direction"] == "unchanged"
+    assert rows[1]["direction"] == "down"
+
+
+def test_briefing_highlights_empty_input() -> None:
+    assert briefing_highlights([]) == []
 
 
 # --- assembly: isolated observed points (survey-wave shape) ----------------------
