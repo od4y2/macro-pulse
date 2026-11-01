@@ -21,12 +21,29 @@ from datetime import date
 from typing import Any
 
 from macropulse.case_study.macro_episodes import MacroEpisode
+from macropulse.views.naming import CALLOUT_LINE_CHARS, wrap_lines
 from macropulse.views.theme import EPISODE_WASH, FONT_SANS, INK_SECONDARY
 
 # Closed vocabulary of causal-attribution words banned from caption text.
 # The S16 lesson applies: this check gets NO exemption for good
 # intentions - captions are worded to pass it from the start.
-_CAUSAL_WORDS = ("because", "caused", "cause", "due to", "led to", "drove", "resulted in")
+_CAUSAL_WORDS = (
+    "because",
+    "caused",
+    "cause",
+    "due to",
+    "led to",
+    "drove",
+    "resulted in",
+)
+
+# Callout placement (second-round refinement): a paper-fraction hair
+# above the plot area, wrapped here (``wrap_lines``) into short lines so
+# a long episode title renders as a narrow block above the data instead
+# of crossing it or clipping at the plot edge - Plotly neither wraps
+# long lines nor honors the annotation width property (measured,
+# 2026-11-01). The top margin in ``layout_update`` reserves the room.
+CALLOUT_Y = 1.02
 
 
 def assert_no_causal_wording(text: str) -> None:
@@ -60,14 +77,18 @@ def episode_overlays(
 
     Band: a full-height neutral wash (``EPISODE_WASH``) drawn BELOW the
     traces, so lines stay readable; no border. Callout: the episode
-    title in secondary ink near the top of the plot area, anchored at
-    the band center. Titles are added for bands at least 1% as wide as
-    the rendered range - narrower bands get the wash only, because a
-    label anchored far outside its band would read as claiming more
-    window than the source documents. (1% keeps a one-year band labeled
-    on the panel's 1960-2025 annual range, the historical case S18
-    presents; text may overflow the band's edges, which is cosmetic,
-    not a claim.)
+    title in secondary ink ABOVE the plot area (second-round UI
+    refinement, 2026-11-01 - it previously sat inside the top of the
+    plot, where it competed with the chart title and the data),
+    anchored at the band center and word-wrapped by Plotly to a fixed
+    width so long titles stay on two short lines, never truncated and
+    never overlapping the series. ``layout_update`` reserves the head-
+    room in the top margin. Titles are added for bands at least 1% as
+    wide as the rendered range - narrower bands get the wash only,
+    because a label anchored far outside its band would read as
+    claiming more window than the source documents. (1% keeps a
+    one-year band labeled on the panel's 1960-2025 annual range, the
+    historical case S18 presents.)
     """
     overlays: list[dict[str, Any]] = []
     in_range = episodes_in_range(episodes, first, last)
@@ -100,11 +121,15 @@ def episode_overlays(
                     "type": "annotation",
                     "spec": {
                         "x": center.isoformat(),
-                        "y": 1,
+                        "y": CALLOUT_Y,  # above the plot area, in the margin
                         "yref": "paper",
                         "xanchor": "center",
-                        "yanchor": "top",
-                        "text": episode.title,
+                        "yanchor": "bottom",
+                        # verbatim words, wrapped into short lines
+                        "text": "<br>".join(
+                            wrap_lines(episode.title, CALLOUT_LINE_CHARS)
+                        ),
+                        "align": "center",
                         "showarrow": False,
                         "font": {
                             "family": FONT_SANS,
@@ -120,19 +145,23 @@ def episode_overlays(
 def episode_captions(episodes: tuple[MacroEpisode, ...]) -> str:
     """Citation caption for the bands shown on a chart: one markdown
     line per episode, naming the window, the source, the verbatim
-    document title, the URL, and the publication date. Wording is
-    checked by ``assert_no_causal_wording`` before it is returned."""
+    document title, the URL, and the publication date. The source is a
+    markdown LINK whose text is the source name + document title
+    (second-round refinement: a bare URL is not a readable citation,
+    and ``st.caption`` renders markdown links natively) - the URL
+    itself still travels in the href, and the exact dates are unchanged.
+    Wording is checked by ``assert_no_causal_wording`` before return."""
     if not episodes:
         return ""
     lines = [
-        "Shaded band: documented event window - "
-        f"{e.title}, {e.start.isoformat()} to {e.end.isoformat()} "
-        f"({e.source_name}, *{e.source_title}*, {e.source_url}, "
-        f"published {e.published.isoformat()}). "
+        f"**Shaded band — documented event window:** {e.title}, "
+        f"{e.start.isoformat()} to {e.end.isoformat()}. "
+        f"Source: [{e.source_name} — *{e.source_title}*]({e.source_url}), "
+        f"published {e.published.isoformat()}. "
         "The band marks the published calendar window; values are drawn as observed."
         for e in episodes
     ]
-    caption = " ".join(lines)
+    caption = "\n\n".join(lines)
     assert_no_causal_wording(caption)
     return caption
 
@@ -151,6 +180,7 @@ def apply_overlays(fig: Any, overlays: list[dict[str, Any]]) -> None:
 
 
 __all__ = [
+    "CALLOUT_Y",
     "apply_overlays",
     "assert_no_causal_wording",
     "episode_captions",

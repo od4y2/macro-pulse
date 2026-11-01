@@ -1,15 +1,38 @@
-# MacroPulse dashboard theme (unit S18).
+# MacroPulse dashboard theme (first-round UI visual refinement, 2026-11-01).
 #
-# Pinned to light: the validated token set in
-# src/macropulse/views/theme.py is light-mode only by decision (a dark
-# variant would be its own validated palette, not an automatic flip).
-# Tokens mirror theme.py: warm paper page, claret accent, near-black ink.
+# Pinned to light: the validated token set in src/macropulse/views/theme.py
+# is light-mode only by decision (a dark variant would be its own validated
+# palette, not an automatic flip).
+#
+# Palette: ink-blue + cool-white. The hexes below mirror the single source of
+# truth in views/theme.py (ACCENT / PAGE / SURFACE / BORDER / INK / ...);
+# change both together. Streamlit-native chrome (widgets, tabs, buttons,
+# links, dataframes) is themed here; scoped component CSS lives in
+# views/chrome_css.py.
 [theme]
 base = "light"
-primaryColor = "#9d2244"
-backgroundColor = "#fdfdfc"
-secondaryBackgroundColor = "#f2f0ea"
-textColor = "#0b0b0b"
+primaryColor = "#2457A7"             # accent: active tab, primary button, focus ring
+backgroundColor = "#F8FAFC"          # page background
+secondaryBackgroundColor = "#F0F3F7" # widget/input surfaces
+textColor = "#17212F"                # text_primary
+borderColor = "#DCE2EA"              # hairline borders (widgets, expanders, cards)
+linkColor = "#2457A7"
+baseFontSize = 15                    # body/controls ~15px; captions scale to ~13px
+baseRadius = "0.375rem"              # unified 6px corners
+showWidgetBorder = true              # consistent hairline on inputs
+showSidebarBorder = true
+codeBackgroundColor = "#F0F3F7"      # sidebar service address: low visual weight
+codeTextColor = "#526174"            # text_secondary
+dataframeHeaderBackgroundColor = "#F0F3F7"
+dataframeBorderColor = "#DCE2EA"
+# h1 34px (page title), h2 19px / h3 18px (module titles); px so the sizes
+# hold regardless of baseFontSize. h4-h6 keep Streamlit defaults.
+headingFontSizes = ["34px", "19px", "18px"]
+
+[theme.sidebar]
+backgroundColor = "#F0F3F7"          # sidebar_background
+textColor = "#17212F"
+borderColor = "#DCE2EA"
 
 [server]
 # Charts and tables carry data; keep the header clean for the wide layout.
