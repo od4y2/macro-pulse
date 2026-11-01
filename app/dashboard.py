@@ -1,7 +1,10 @@
 """MacroPulse dashboard (units S14-S18): country, comparison, provenance
 views with freshness labels, quality badges, and limitations, rendered
-in the S18 editorial visual language (muted validated palette, serif
-display titles, focus-and-context charts, documented-episode bands).
+in the editorial visual language (muted validated palette, entity-
+colored comparison charts with focus emphasis, documented-episode
+bands) with the first-round UI
+refinement applied (2026-11-01): ink-blue + cool-white tokens, serif
+page title only, centrally managed chrome CSS (views/chrome_css.py).
 
 Thin Streamlit rendering over the S13 query service; all data shaping
 lives in tested, pure functions (``macropulse.views.assembly``), labels
@@ -59,6 +62,7 @@ from macropulse.views.assembly import (
     isolated_point_indices,
     provenance_rows,
 )
+from macropulse.views.chrome_css import dashboard_css
 from macropulse.views.client import QueryServiceClient, QueryServiceError
 from macropulse.views.labels import (
     FRESHNESS_LAG_STEPS,
@@ -70,30 +74,35 @@ from macropulse.views.labels import (
     missingness_note,
     quality_badge,
 )
+from macropulse.views.naming import (
+    display_name,
+    indicator_help,
+    option_label,
+    unit_display,
+    wrap_title,
+)
 from macropulse.views.theme import (
+    ACCENT,
     INK,
     MARKER_OUTLINE_WIDTH,
     MARKER_SIZE_ISOLATED,
-    PAGE,
+    SURFACE,
     focus_label_point,
     layout_update,
+    marker_symbol,
     series_style,
 )
 
 st.set_page_config(page_title="MacroPulse", page_icon="🌍", layout="wide")
 
-# Editorial typography: open serif display face for headings (financial-
-# press faces are proprietary and are NOT used); degrades to Georgia
-# offline rather than substituting silently. Body/data text stays the
-# system sans (legibility at small sizes; config.toml pins light mode).
-st.markdown(
-    "<style>"
-    "@import url('https://fonts.googleapis.com/css2?family=Spectral:wght@500;600&display=swap');"
-    "h1, h2, h3 {font-family: Spectral, Georgia, serif !important;}"
-    ".stCaption {color: #52514e;}"
-    "</style>",
-    unsafe_allow_html=True,
-)
+# Chrome styling is centrally managed: colors come from the views.theme
+# tokens, selectors are stable data-testid/data-baseweb hooks only, and
+# what config.toml themes natively is not repeated here. The serif
+# display face (Spectral - financial-press faces are proprietary and are
+# NOT used) is reserved for the page title; it degrades to Georgia
+# offline rather than substituting silently. Everything else stays the
+# system sans (config.toml pins light mode).
+st.markdown(f"<style>{dashboard_css()}</style>", unsafe_allow_html=True)
 
 st.title("MacroPulse")
 st.caption(
@@ -158,6 +167,20 @@ with st.sidebar:
     # today in UTC (a render-layer clock read); every label derives from the
     # value, never from a hidden clock.
     as_of = st.date_input("As-of date (freshness)", value=datetime.now(UTC).date())
+    # Opt-in reading aid (user request, 2026-11-01): straight segments
+    # joining each series' OBSERVED points across periods with no value
+    # (survey-wave shapes such as Findex). Off by default - gaps-as-gaps
+    # is the honest baseline. Display-only either way: connectgaps draws
+    # across missing periods without adding a single value, and the
+    # charts' captions/notes describe whichever mode is active.
+    connect_observed = st.checkbox(
+        "Connect observed points (visual aid)",
+        value=False,
+        help="Draws straight lines between a series' observed points across "
+        "periods with no recorded value. A reading aid only: nothing is "
+        "interpolated or zero-filled, and the tables are unchanged. Off by "
+        "default, so gaps render as gaps.",
+    )
 
 try:
     countries = fetch_countries(API_URL)
@@ -174,9 +197,17 @@ if not countries or not indicators:
     st.stop()
 
 country_labels = {c["iso3"]: c["name"] for c in countries}
-indicator_labels = {
-    i["indicator_id"]: f"{i['name']} [{i['indicator_id']}]" for i in indicators
+# Indicator naming is tiered (views.naming): selectors and chart titles
+# show the display-name + unit tiers; the FULL served name and internal
+# code stay reachable in each widget's native help tooltip (below), in
+# the methodology expander, and in every table's indicator_id column.
+# Underlying fields, widget keys and query params are untouched.
+indicator_by_id = {i["indicator_id"]: i for i in indicators}
+option_labels = {
+    i["indicator_id"]: option_label(i["indicator_id"], i["name"], i["unit"])
+    for i in indicators
 }
+INDICATOR_HELP = indicator_help(indicators)
 catalog_by_id = {i.indicator_id: i for i in CATALOG}
 
 EVIDENCE_LABEL_MEANINGS = {
@@ -195,16 +226,32 @@ def line_chart(
     title: str,
     yaxis_title: str,
     focus: str | None = None,
+    connect_observed: bool = False,
 ) -> go.Figure:
-    """One line per country in the S18 editorial language.
+    """One line per country in the editorial visual language.
 
-    Focus-and-context: the ``focus`` country (and every series when
-    there is exactly one) wears its entity color; all others wear
-    context grey, so a ten-economy comparison never puts ten hues on
-    screen. Gaps stay gaps (missing periods are never interpolated);
+    Every series wears its entity color and a legend entry, so a
+    comparison reads country-by-country on the chart itself (comparison
+    fix, 2026-11-01: the earlier one-hue-plus-uniform-grey display left
+    non-focus countries indistinguishable on the chart). ``focus`` is
+    emphasis, not exclusive color: a heavier line plus a direct label on
+    its last observed point. Countries the palette validation flagged
+    also carry a hue-independent texture (``RELIEF_DASH`` on the line,
+    ``RELIEF_SYMBOL`` on isolated markers - see views.theme). A chart
+    with exactly ONE series (Country view, briefing small multiples)
+    draws the observation in the brand accent ink blue with no texture
+    instead - entity hue and relief carry no information when nothing is
+    being compared. Gaps stay gaps (missing periods are never interpolated);
     provenance travels on hover exactly as before (S15). Documented
     episodes overlapping the rendered range draw as neutral bands with
     a citation in the caller's caption (S18).
+
+    ``connect_observed`` (opt-in sidebar toggle, default off) sets
+    ``connectgaps`` on the line traces: straight segments join each
+    series' observed points across periods with no value - a reading
+    aid for survey-wave shapes. It is display-only: connectgaps adds
+    no value, interpolates nothing, and the data, tables, hover
+    provenance and isolated-point markers are identical either way.
 
     Survey-wave series (e.g. Findex account ownership: five observed
     years, every neighbour a source-recorded gap) would draw NO line at
@@ -224,9 +271,20 @@ def line_chart(
     fig = go.Figure()
     first_period: str | None = None
     last_period: str | None = None
+    single_series = len(traces) == 1
     for t in traces:
         is_focus = focus is None or t["country"] == focus
         style = series_style(t["country"], is_focus)
+        if single_series and is_focus:
+            # One country on screen (Country view, briefing small
+            # multiples): the observation wears the brand ink blue with
+            # no relief texture - the entity hue and its dash/symbol are
+            # identity carriers for comparisons and carry no information
+            # when nothing is being compared.
+            style = {**style, "color": ACCENT, "dash": "solid"}
+            symbol = "circle"
+        else:
+            symbol = marker_symbol(t["country"])
         fig.add_trace(
             go.Scatter(
                 x=t["xs"],
@@ -234,8 +292,15 @@ def line_chart(
                 mode="lines",  # no markers on 60+ point series; hover
                 # carries point inspection without visual clutter
                 name=t["country"],
-                connectgaps=False,  # missing periods are gaps, not interpolated lines
-                line={"color": style["color"], "width": style["width"]},
+                # off (default): missing periods are gaps, never drawn
+                # through; on (opt-in toggle): segments join observed
+                # points across gaps - a reading aid, not interpolation
+                connectgaps=connect_observed,
+                line={
+                    "color": style["color"],
+                    "width": style["width"],
+                    "dash": style["dash"],  # relief texture, solid for most
+                },
                 showlegend=style["showlegend"] and len(traces) > 1,
                 customdata=[
                     [h["vintage"], h["evidence_label"], h["quality_grade"]]
@@ -258,7 +323,8 @@ def line_chart(
                     marker={
                         "size": MARKER_SIZE_ISOLATED,
                         "color": style["color"],
-                        "line": {"color": PAGE, "width": MARKER_OUTLINE_WIDTH},
+                        "symbol": symbol,  # relief shape where no line renders
+                        "line": {"color": SURFACE, "width": MARKER_OUTLINE_WIDTH},
                     },
                     customdata=[
                         [
@@ -272,8 +338,12 @@ def line_chart(
                 )
             )
         if t["xs"]:
-            first_period = t["xs"][0] if first_period is None else min(first_period, t["xs"][0])
-            last_period = t["xs"][-1] if last_period is None else max(last_period, t["xs"][-1])
+            first_period = (
+                t["xs"][0] if first_period is None else min(first_period, t["xs"][0])
+            )
+            last_period = (
+                t["xs"][-1] if last_period is None else max(last_period, t["xs"][-1])
+            )
 
     fig.update_layout(**layout_update(title, yaxis_title))
 
@@ -299,7 +369,9 @@ def line_chart(
         apply_overlays(
             fig,
             episode_overlays(
-                MACRO_EPISODES, date.fromisoformat(first_period), date.fromisoformat(last_period)
+                MACRO_EPISODES,
+                date.fromisoformat(first_period),
+                date.fromisoformat(last_period),
             ),
         )
     return fig
@@ -308,6 +380,85 @@ def line_chart(
 def with_badges(rows: list[dict]) -> list[dict]:
     """Decorate the quality_grade column with its badge symbol."""
     return [{**r, "quality_grade": quality_badge(r["quality_grade"])} for r in rows]
+
+
+# --- table display config (second-round refinement, 2026-11-01) --------------
+#
+# Display-only: readable header labels and stable column widths for the
+# served tables. Underlying field names, values, precision, row order and
+# the CSV/JSON downloads are untouched - a column_config label never
+# renames the exported field, and NO format strings are used anywhere, so
+# no raw observation can be rounded by presentation. Dates stay exactly
+# as served (ISO strings); the missing/source distinction stays in the
+# value and missing_reason columns, which keep their full content.
+_CC = st.column_config
+
+_COUNTRY_TABLE_COLUMNS = {
+    "indicator_id": _CC.TextColumn("Indicator code", width="medium"),
+    "period": _CC.TextColumn("Period", width="small"),
+    "value": _CC.TextColumn("Value", width="medium"),
+    "unit": _CC.TextColumn("Unit", width="small"),
+    "frequency": _CC.TextColumn("Frequency", width="small"),
+    "vintage": _CC.TextColumn("Vintage", width="small"),
+    "evidence_label": _CC.TextColumn("Evidence", width="small"),
+    "quality_grade": _CC.TextColumn("Quality", width="small"),
+    "source": _CC.TextColumn("Source", width="large"),
+    "source_role": _CC.TextColumn("Role", width="small"),
+    "release_time": _CC.TextColumn("Released", width="medium"),
+    "retrieval_time": _CC.TextColumn("Retrieved", width="medium"),
+    "missing_reason": _CC.TextColumn("Missing reason", width="medium"),
+}
+
+_FRESHNESS_COLUMNS = {
+    "country_iso3": _CC.TextColumn("Country", width="small"),
+    "indicator_id": _CC.TextColumn("Indicator code", width="medium"),
+    "last_observed": _CC.TextColumn("Last observed", width="small"),
+    "age_months": _CC.NumberColumn("Age (months)", width="small"),
+    "age_steps": _CC.NumberColumn("Age (freq. steps)", width="small"),
+    "days_since_retrieval": _CC.NumberColumn("Days since retrieval", width="small"),
+    "state": _CC.TextColumn("Freshness", width="small"),
+}
+
+_COMPARISON_FRESHNESS_COLUMNS = {
+    "country": _CC.TextColumn("Country", width="small"),
+    "observed": _CC.NumberColumn("Observed", width="small"),
+    "missing": _CC.NumberColumn("Missing", width="small"),
+    "source_no_data": _CC.NumberColumn("Source: no value", width="small"),
+    "no_record": _CC.NumberColumn("No record", width="small"),
+    "total_periods": _CC.NumberColumn("Grid periods", width="small"),
+    "last_observed": _CC.TextColumn("Last observed", width="small"),
+    "age_steps": _CC.NumberColumn("Age (freq. steps)", width="small"),
+    "state": _CC.TextColumn("Freshness", width="small"),
+}
+
+_PROVENANCE_COLUMNS = {
+    "period": _CC.TextColumn("Period", width="small"),
+    "vintage": _CC.TextColumn("Vintage", width="small"),
+    "value": _CC.TextColumn("Value", width="medium"),
+    "is_latest_vintage": _CC.CheckboxColumn("Latest vintage", width="medium"),
+    "quality_grade": _CC.TextColumn("Quality", width="small"),
+    "evidence_label": _CC.TextColumn("Evidence", width="small"),
+    "source": _CC.TextColumn("Source", width="large"),
+    "release_time": _CC.TextColumn("Released", width="medium"),
+    "retrieval_time": _CC.TextColumn("Retrieved", width="medium"),
+    "missing_reason": _CC.TextColumn("Missing reason", width="medium"),
+}
+
+_BRIEFING_CLAIM_COLUMNS = {
+    "claim_text": _CC.TextColumn("Claim", width="large"),
+    "validated": _CC.CheckboxColumn("Validated", width="small"),
+    "evidence_refs": _CC.NumberColumn("Evidence refs", width="small"),
+}
+
+
+def _matrix_columns(countries: list[str]) -> dict:
+    """Comparison-matrix columns: narrow period column plus one narrow
+    value column per selected country (ISO3 headers already identify the
+    entity; widths keep a 10-economy matrix from crowding)."""
+    cols: dict = {"period": _CC.TextColumn("Period", width="small")}
+    for iso3 in countries:
+        cols[iso3] = _CC.TextColumn(iso3, width="small")
+    return cols
 
 
 with st.expander("Labels legend"):
@@ -346,9 +497,10 @@ with tab_country:
     )
     selected_indicators = st.multiselect(
         "Indicators (one for the chart; several for the table)",
-        list(indicator_labels),
-        default=list(indicator_labels)[:1],
-        format_func=indicator_labels.get,
+        list(option_labels),
+        default=list(option_labels)[:1],
+        format_func=option_labels.get,
+        help=INDICATOR_HELP,
     )
     if not selected_indicators:
         st.info("Select at least one indicator.")
@@ -366,11 +518,13 @@ with tab_country:
             units = {o["unit"] for o in obs}
             if len(selected_indicators) == 1 and len(units) == 1:
                 periods = [o["period"] for o in obs]
+                meta = indicator_by_id[selected_indicators[0]]
                 st.plotly_chart(
                     line_chart(
                         chart_traces(obs, [selected_iso3]),
-                        indicator_labels[selected_indicators[0]],
-                        next(iter(units)),
+                        wrap_title(display_name(meta["indicator_id"], meta["name"])),
+                        unit_display(next(iter(units))),
+                        connect_observed=connect_observed,
                     ),
                     width="stretch",
                 )
@@ -383,26 +537,34 @@ with tab_country:
                 )
                 if band_caption:
                     st.caption(band_caption)
-                st.caption(chart_caption(obs))
+                st.caption(chart_caption(obs, connect_observed=connect_observed))
                 note = missingness_note(obs)
                 if note:
                     st.caption(note)
             elif len(units) > 1:
                 st.warning(
                     "Several indicators selected with different units "
-                    f"({', '.join(sorted(units))}) - a shared chart axis "
-                    "would mislead, so only the table is shown."
+                    f"({', '.join(sorted(unit_display(u) for u in units))}) - a "
+                    "shared chart axis would mislead, so only the table is shown."
                 )
             st.dataframe(
-                with_badges(country_view_rows(obs)), width="stretch", hide_index=True
+                with_badges(country_view_rows(obs)),
+                width="stretch",
+                hide_index=True,
+                column_config=_COUNTRY_TABLE_COLUMNS,
             )
             st.dataframe(
-                freshness_summary(obs, as_of), width="stretch", hide_index=True
+                freshness_summary(obs, as_of),
+                width="stretch",
+                hide_index=True,
+                column_config=_FRESHNESS_COLUMNS,
             )
             st.caption(
-                "Latest vintage per period, exactly as served (no rounding). "
-                "Missing values are named with their reason; freshness is "
-                f"computed against {as_of.isoformat()}."
+                "**Tables** latest vintage per period, exactly as served "
+                "(no rounding).  \n"
+                "**Missing** values are named with their reason - never "
+                "imputed.  \n"
+                f"**Freshness** computed against {as_of.isoformat()}."
             )
             with st.expander("Indicator methodology and limitations"):
                 for indicator_id in selected_indicators:
@@ -436,7 +598,10 @@ with tab_country:
 
 with tab_comparison:
     comparison_indicator = st.selectbox(
-        "Indicator", list(indicator_labels), format_func=indicator_labels.get
+        "Indicator",
+        list(option_labels),
+        format_func=option_labels.get,
+        help=INDICATOR_HELP,
     )
     comparison_countries = st.multiselect(
         "Countries",
@@ -447,13 +612,14 @@ with tab_comparison:
     if not comparison_countries:
         st.info("Select at least one country.")
     else:
-        # Focus-and-context (S18): the focus country wears its entity
-        # color; every other selected country renders in context grey so
-        # a ten-economy comparison never puts ten hues on screen. The
-        # matrix table below carries the numbers; hover carries
-        # per-point provenance on every line.
+        # Entity color per country (S18 palette): every selected country
+        # is distinguishable on the chart and named in the legend (fix
+        # 2026-11-01 - uniform context grey made non-focus countries
+        # unreadable). The focus country adds a heavier line and a
+        # direct end label. The matrix table below carries the numbers;
+        # hover carries per-point provenance on every line.
         comparison_focus = st.selectbox(
-            "Focus country (others in grey)",
+            "Focus country (heavier line + direct label)",
             comparison_countries,
             index=0,
             format_func=lambda iso3: f"{iso3} — {country_labels[iso3]}",
@@ -472,12 +638,19 @@ with tab_comparison:
             traces = chart_traces(obs, comparison_countries)
             if traces:
                 periods = sorted({o["period"] for o in obs})
+                meta = indicator_by_id.get(comparison_indicator, {})
                 st.plotly_chart(
                     line_chart(
                         traces,
-                        indicator_labels[comparison_indicator],
-                        traces[0]["unit"],
+                        wrap_title(
+                            display_name(
+                                comparison_indicator,
+                                meta.get("name", comparison_indicator),
+                            )
+                        ),
+                        unit_display(traces[0]["unit"]),
                         focus=comparison_focus,
+                        connect_observed=connect_observed,
                     ),
                     width="stretch",
                 )
@@ -490,7 +663,7 @@ with tab_comparison:
                 )
                 if band_caption:
                     st.caption(band_caption)
-                st.caption(chart_caption(obs))
+                st.caption(chart_caption(obs, connect_observed=connect_observed))
                 note = missingness_note(obs)
                 if note:
                     st.caption(note)
@@ -498,6 +671,7 @@ with tab_comparison:
                 comparison_matrix(obs, comparison_countries),
                 width="stretch",
                 hide_index=True,
+                column_config=_matrix_columns(comparison_countries),
             )
             freshness_rows = [
                 f
@@ -510,16 +684,28 @@ with tab_comparison:
                 ),
                 width="stretch",
                 hide_index=True,
+                column_config=_COMPARISON_FRESHNESS_COLUMNS,
             )
             st.caption(
-                "Latest vintage per period. The focus country is drawn in "
-                "its panel color, other selected countries in grey "
-                "(hover any line for per-point provenance; the matrix below "
-                "carries every value). Cells without an observation are "
-                "named missing (with reason when recorded) - never blank, "
-                "zero, or interpolated; the chart leaves gaps rather than "
-                "drawing through missing periods. Freshness is computed "
-                f"against {as_of.isoformat()}."
+                "**Reading the chart** every country wears its fixed panel "
+                "color and a legend entry; the focus country adds a heavier "
+                "line and a direct end label, and ZAF/MEX also a dash and "
+                "marker shape (palette relief). Hover any line for per-point "
+                "provenance; the matrix carries every value.  \n"
+                "**Tables** latest vintage per period. Cells without an "
+                "observation are named missing (with reason when recorded) "
+                "- never blank, zero, or interpolated; "
+                + (
+                    # describe what the chart actually draws, per the toggle
+                    "connector lines (sidebar option, on) join observed "
+                    "points across unobserved periods as a reading aid - "
+                    "still nothing interpolated or zero-filled."
+                    if connect_observed
+                    else "the chart leaves gaps rather than drawing "
+                    "through missing periods."
+                )
+                + "  \n"
+                f"**Freshness** computed against {as_of.isoformat()}."
             )
 
 # --- Provenance view: the vintage chain behind one series --------------------
@@ -532,8 +718,9 @@ with tab_provenance:
     )
     prov_indicator = st.selectbox(
         "Indicator (provenance)",
-        list(indicator_labels),
-        format_func=indicator_labels.get,
+        list(option_labels),
+        format_func=option_labels.get,
+        help=INDICATOR_HELP,
     )
     obs = fetch_all_vintages(API_URL, prov_indicator, prov_iso3)
     if not obs:
@@ -546,24 +733,31 @@ with tab_provenance:
         )
         st.metric("Rows (all vintages)", len(rows))
         st.metric("Periods with >1 vintage", with_revisions)
-        st.dataframe(with_badges(rows), width="stretch", hide_index=True)
+        st.dataframe(
+            with_badges(rows),
+            width="stretch",
+            hide_index=True,
+            column_config=_PROVENANCE_COLUMNS,
+        )
         st.caption(
-            "Every stored vintage, sorted by period then vintage; the newest "
-            "vintage per period is flagged. Superseded vintages are retained "
-            "for revision transparency (RQ4) - nothing is overwritten."
+            "**Rows** every stored vintage, sorted by period then vintage; "
+            "the newest vintage per period is flagged.  \n"
+            "**Revisions** superseded vintages are retained for "
+            "transparency (RQ4) - nothing is overwritten."
         )
 
 # --- AI briefing: on-demand structured document for one country ----------------
 
 with tab_briefing:
     st.caption(
-        "On demand, one country at a time: statements derived only from "
-        "validated observations (evidence: real), adjudicated claim by claim "
-        "against that JSON, and screened for banned phrasing and fabricated "
-        "numbers. Every generation appends an audit run. When the LLM prose "
-        "source is unavailable or its draft fails a gate, the deterministic "
-        "template document is served instead - with a warning naming the "
-        "reason. No forecasts, no causal claims, no investment advice."
+        "On demand, one country at a time.  \n"
+        "**Data basis** validated observations (evidence: real) only.  \n"
+        "**Checks** every claim is adjudicated against that data and "
+        "screened for banned phrasing and fabricated numbers; each "
+        "generation appends an audit run.  \n"
+        "**If generation fails** the deterministic template document is "
+        "served instead, with a warning naming the reason.  \n"
+        "No forecasts, no causal claims, no investment advice."
     )
     briefing_iso3 = st.selectbox(
         "Country (briefing)",
@@ -594,9 +788,7 @@ with tab_briefing:
                 f"press **Generate briefing** to run {briefing_iso3}."
             )
         if result.get("warning"):
-            st.warning(
-                f"Served by the deterministic fallback - {result['warning']}"
-            )
+            st.warning(f"Served by the deterministic fallback - {result['warning']}")
         st.markdown(result.get("prose", ""))
         st.caption(
             f"model: {result.get('model')} · prompt: "
@@ -619,9 +811,13 @@ with tab_briefing:
                 cols = st.columns(4)
                 for col, h in zip(cols, highlights[row_start : row_start + 4]):
                     with col:
+                        meta = indicator_by_id.get(h["indicator_id"])
                         st.metric(
-                            indicator_labels.get(h["indicator_id"], h["indicator_id"]),
-                            f"{display_value(h['value'])} {h['unit']}",
+                            display_name(
+                                h["indicator_id"],
+                                meta["name"] if meta else h["indicator_id"],
+                            ),
+                            f"{display_value(h['value'])} {unit_display(h['unit'])}",
                         )
                         # No st.metric delta: Streamlit draws an arrow glyph
                         # for ANY text delta, and a directionless "from 2.8"
@@ -636,11 +832,12 @@ with tab_briefing:
                         else:
                             st.caption(f"{h['period']} · no consecutive prior period")
             st.caption(
-                "Tiles rounded for display (2 decimals); latest-vintage "
-                "real-evidence observations exactly as served. A prior is "
-                "shown only when the two periods are exactly one frequency "
-                "step apart - no comparison across gaps, matching the "
-                "briefing's change-claim rule."
+                "**Values** tiles rounded for display (2 decimals); the "
+                "observations behind them are latest-vintage, "
+                "real-evidence, exactly as served.  \n"
+                "**Priors** shown only when the two periods are exactly "
+                "one frequency step apart - no comparison across gaps, "
+                "matching the briefing's change-claim rule."
             )
 
             st.subheader("Indicator trends")
@@ -650,14 +847,19 @@ with tab_briefing:
                     obs_i = fetch_latest(API_URL, h["indicator_id"], result_iso3)
                     traces = chart_traces(obs_i, [result_iso3])
                     if traces:
+                        meta = indicator_by_id.get(h["indicator_id"])
                         st.plotly_chart(
                             line_chart(
                                 traces,
-                                indicator_labels.get(
-                                    h["indicator_id"], h["indicator_id"]
+                                wrap_title(
+                                    display_name(
+                                        h["indicator_id"],
+                                        meta["name"] if meta else h["indicator_id"],
+                                    )
                                 ),
-                                traces[0]["unit"],
+                                unit_display(traces[0]["unit"]),
                                 focus=result_iso3,
+                                connect_observed=connect_observed,
                             ),
                             width="stretch",
                             # Unique per indicator: a loop of plotly_chart
@@ -667,8 +869,15 @@ with tab_briefing:
                         )
             st.caption(
                 "One chart per indicator: the full latest-vintage series for "
-                "this country. Gaps stay gaps (never interpolated, never "
-                "zero-filled); provenance on hover; documented episodes as "
+                "this country. "
+                + (
+                    "Connector lines (sidebar option, on) join observed "
+                    "points across unobserved periods - a reading aid; "
+                    "still never interpolated, never zero-filled."
+                    if connect_observed
+                    else "Gaps stay gaps (never interpolated, never zero-filled)."
+                )
+                + " Provenance on hover; documented episodes as "
                 "neutral bands."
             )
 
@@ -684,6 +893,7 @@ with tab_briefing:
                 ],
                 width="stretch",
                 hide_index=True,
+                column_config=_BRIEFING_CLAIM_COLUMNS,
             )
             st.caption(
                 "Every candidate claim - passed and rejected - as persisted "

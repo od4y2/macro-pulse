@@ -261,17 +261,17 @@ def test_chart_caption_normal_case() -> None:
             obs(country_iso3="ZAF"),
         ]
     )
-    assert "2 economies" in caption
+    assert "**Coverage** 2 economies" in caption
     assert "2 periods (2024-01-01 to 2025-01-01)" in caption
-    assert "evidence: real" in caption
-    assert "vintage: 2026-01-25" in caption
-    assert "missing" not in caption  # no missing points -> no missing claim
+    assert "**Evidence** real" in caption
+    assert "**Vintage** 2026-01-25" in caption
+    assert "Missing" not in caption  # no missing points -> no missing claim
 
 
 def test_chart_caption_singular_and_vintage_range() -> None:
     caption = chart_caption([obs(), obs(period="2024-01-01", vintage="2025-01-26")])
-    assert "1 economy" in caption
-    assert "vintages: 2025-01-26 to 2026-01-25" in caption
+    assert "**Coverage** 1 economy" in caption
+    assert "**Vintage** 2025-01-26 to 2026-01-25" in caption
 
 
 def test_chart_caption_names_missing_points() -> None:
@@ -283,11 +283,38 @@ def test_chart_caption_names_missing_points() -> None:
             ),
         ]
     )
-    assert "1 missing point (gaps, named in tables)" in caption
+    assert "**Missing** 1 point - drawn as gaps, named in the tables" in caption
 
 
 def test_chart_caption_empty_input() -> None:
     assert chart_caption([]) == "No observations."
+
+
+def test_chart_caption_connector_mode_rewords_the_missing_line() -> None:
+    # Opt-in connector toggle (2026-11-01): with connectors ON the
+    # Missing line must not claim gaps are left open - it describes what
+    # the chart actually draws - while the no-interpolation promise
+    # survives either way. The default (and explicit False) wording is
+    # byte-identical to the pre-feature caption.
+    obs_list = [
+        obs(),
+        obs(period="2024-01-01", value=None, missing_reason="not_observed_at_period"),
+    ]
+    caption = chart_caption(obs_list, connect_observed=True)
+    assert "connector lines (visual aid)" in caption
+    assert "nothing interpolated" in caption
+    assert "drawn as gaps" not in caption
+    default = chart_caption(obs_list)
+    assert default == chart_caption(obs_list, connect_observed=False)
+    assert "**Missing** 1 point - drawn as gaps, named in the tables" in default
+
+
+def test_chart_caption_connector_mode_without_missing_is_identical() -> None:
+    # dense series: connectors cross nothing, so the caption must not
+    # grow a connector/missing claim that the chart cannot show
+    obs_list = [obs(), obs(country_iso3="ZAF", period="2024-01-01", value=0.7)]
+    assert chart_caption(obs_list, connect_observed=True) == chart_caption(obs_list)
+    assert "connector" not in chart_caption(obs_list, connect_observed=True)
 
 
 # --- missingness note (survey-wave gaps vs unrecorded periods) -------------------------
@@ -314,8 +341,11 @@ def _findex_shape() -> list[dict]:
 def test_missingness_note_lists_survey_years_and_names_source_gaps() -> None:
     note = missingness_note(_findex_shape())
     assert note is not None
-    assert "observed: 2011-01-01, 2014-01-01" in note
-    assert "4 periods the source itself reports no value for" in note
+    assert "**Observed** 2011-01-01, 2014-01-01" in note
+    assert (
+        "**Source-confirmed gaps** 4 periods the source itself reports no value for"
+        in note
+    )
     assert "wb_missing_value x4" in note
     assert "not retrieval omissions" in note
     assert "Nothing is interpolated or zero-filled" in note
@@ -331,7 +361,7 @@ def test_missingness_note_flags_unrecorded_grid_periods() -> None:
         ]
     )
     assert note is not None
-    assert "1 grid period with no record at all (USA x1)" in note
+    assert "**Unrecorded** 1 grid period with no record at all (USA x1)" in note
     assert "expected but missing" in note
 
 
@@ -340,8 +370,8 @@ def test_missingness_note_counts_many_observed_periods_instead_of_listing() -> N
     rows.append(obs(period="2015-06-01", value=None, missing_reason="gap"))
     note = missingness_note(rows)
     assert note is not None
-    assert f"{12} observed periods" in note
-    assert "observed: " not in note
+    assert "**Observed** 12 periods" in note
+    assert "**Observed** 2" not in note  # counted, never listed by name
     assert 12 > OBSERVED_PERIODS_LIST_MAX  # the convention the note follows
 
 

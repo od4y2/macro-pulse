@@ -158,8 +158,9 @@ def missingness_note(observations: list[dict]) -> str | None:
     """Caption text distinguishing the two kinds of chart gaps.
 
     The chart leaves gaps for missing periods (never interpolated, never
-    zero-filled), but "missing" is two different facts and this note
-    keeps them apart:
+    zero-filled; with the opt-in connector toggle on, lines join the
+    observed points across the gaps - still adding no value), but
+    "missing" is two different facts and this note keeps them apart:
 
     - **source-confirmed gaps** - a row exists with a NULL value and a
       recorded ``missing_reason``: the provider was asked and itself
@@ -201,38 +202,53 @@ def missingness_note(observations: list[dict]) -> str | None:
     if not source_gaps and not unrecorded:
         return None
 
+    # Second-round refinement (2026-11-01): one labelled line per fact
+    # instead of a run-on " · " chain. The labels are short (Observed /
+    # Source-confirmed gaps / Unrecorded) but every number, reason and
+    # period name comes from the observations passed in, and the two
+    # kinds of "missing" stay strictly distinguished - the source
+    # itself reporting no value is never lumped with a retrieval gap.
     if len(observed_periods) <= OBSERVED_PERIODS_LIST_MAX:
-        parts = ["observed: " + ", ".join(observed_periods)]
+        parts = ["**Observed** " + ", ".join(observed_periods)]
     else:
-        parts = [f"{len(observed_periods)} observed periods"]
+        parts = [f"**Observed** {len(observed_periods)} periods"]
     if source_gaps:
         reason_text = ", ".join(
             f"{reason} x{count}" for reason, count in sorted(reasons.items())
         )
         parts.append(
-            f"{source_gaps} period"
+            f"**Source-confirmed gaps** {source_gaps} period"
             f"{'' if source_gaps == 1 else 's'} the source itself reports "
-            f"no value for ({reason_text}) - source-confirmed gaps "
-            "(e.g. non-survey years of a survey series), not retrieval "
-            "omissions"
+            f"no value for ({reason_text}) - not retrieval omissions"
         )
     if unrecorded:
         total = sum(unrecorded.values())
         detail = ", ".join(f"{c} x{n}" for c, n in sorted(unrecorded.items()))
         parts.append(
-            f"{total} grid period"
+            f"**Unrecorded** {total} grid period"
             f"{'' if total == 1 else 's'} with no record at all ({detail}) "
             "- expected but missing (a retrieval/recording gap)"
         )
-    return " · ".join(parts) + ". Nothing is interpolated or zero-filled."
+    parts.append("Nothing is interpolated or zero-filled.")
+    return "  \n".join(parts)
 
 
-def chart_caption(observations: list[dict]) -> str:
-    """One-line provenance summary for a chart, built from the data shown.
+def chart_caption(observations: list[dict], connect_observed: bool = False) -> str:
+    """Labelled provenance summary for a chart, built from the data shown.
 
+    Second-round refinement (2026-11-01): the single " · "-chained line
+    became one short-labelled line per fact (Coverage / Evidence /
+    Vintage / Missing, rendered as markdown line breaks by st.caption),
+    so the eye can find one fact without re-reading the whole chain.
     Counts (economies, periods, missing points), evidence labels, and
     the vintage range all come from the observations rendered - the
     caption cannot claim anything the chart does not show.
+
+    ``connect_observed`` mirrors the sidebar connector toggle (opt-in
+    reading aid, default off): the Missing line must describe what the
+    chart actually draws - gaps when off, connector lines across the
+    gaps when on - while the no-interpolation promise holds either way
+    (connectgaps joins observed points; it adds no value).
     """
     if not observations:
         return "No observations."
@@ -241,19 +257,27 @@ def chart_caption(observations: list[dict]) -> str:
     evidence = sorted({o["evidence_label"] for o in observations})
     vintages = sorted({o["vintage"] for o in observations})
     missing = sum(1 for o in observations if o["value"] is None)
-    parts = [
-        f"{len(countries)} economy"
-        if len(countries) == 1
-        else f"{len(countries)} economies",
-        f"{len(periods)} periods ({periods[0]} to {periods[-1]})",
-        f"evidence: {', '.join(evidence)}",
-        f"vintage: {vintages[0]}"
+    lines = [
+        "**Coverage** "
+        + (
+            f"{len(countries)} economy"
+            if len(countries) == 1
+            else f"{len(countries)} economies"
+        )
+        + f" · {len(periods)} periods ({periods[0]} to {periods[-1]})",
+        f"**Evidence** {', '.join(evidence)}",
+        f"**Vintage** {vintages[0]}"
         if len(vintages) == 1
-        else f"vintages: {vintages[0]} to {vintages[-1]}",
+        else f"**Vintage** {vintages[0]} to {vintages[-1]}",
     ]
     if missing:
-        parts.append(
-            f"{missing} missing point"
-            f"{'' if missing == 1 else 's'} (gaps, named in tables)"
+        gap_wording = (
+            "named in the tables; connector lines (visual aid) join "
+            "observed points across them - nothing interpolated"
+            if connect_observed
+            else "drawn as gaps, named in the tables"
         )
-    return " · ".join(parts)
+        lines.append(
+            f"**Missing** {missing} point{'' if missing == 1 else 's'} - {gap_wording}"
+        )
+    return "  \n".join(lines)

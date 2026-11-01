@@ -18,12 +18,14 @@ import pytest
 
 from macropulse.case_study.macro_episodes import MACRO_EPISODES, MacroEpisode
 from macropulse.views.annotations import (
+    CALLOUT_Y,
     apply_overlays,
     assert_no_causal_wording,
     episode_captions,
     episode_overlays,
     episodes_in_range,
 )
+from macropulse.views.naming import CALLOUT_LINE_CHARS, wrap_lines
 from macropulse.views.theme import EPISODE_WASH
 
 
@@ -101,10 +103,17 @@ def test_real_2020_episode_yields_band_and_callout_on_panel_range() -> None:
     assert shape["spec"]["fillcolor"] == EPISODE_WASH
     assert shape["spec"]["layer"] == "below"  # lines stay readable over the wash
     assert shape["spec"]["line"]["width"] == 0
-    # callout anchored at the band center, inside the band
+    # callout anchored at the band center, ABOVE the plot area (second-
+    # round refinement: it no longer competes with the title or the data)
     assert callout["spec"]["xanchor"] == "center"
     assert "2020-01-01" <= callout["spec"]["x"] <= "2020-12-31"
-    assert callout["spec"]["text"] == MACRO_EPISODES[0].title
+    # verbatim words, wrapped into short lines (Plotly neither wraps
+    # long lines nor honors annotation width - measured 2026-11-01)
+    expected_text = "<br>".join(wrap_lines(MACRO_EPISODES[0].title, CALLOUT_LINE_CHARS))
+    assert callout["spec"]["text"] == expected_text
+    assert all(len(line) <= CALLOUT_LINE_CHARS for line in expected_text.split("<br>"))
+    assert callout["spec"]["y"] == CALLOUT_Y > 1  # paper coords, in the margin
+    assert callout["spec"]["yanchor"] == "bottom"
 
 
 def test_narrow_band_gets_wash_but_no_callout() -> None:
@@ -163,20 +172,33 @@ def test_apply_overlays_rejects_unknown_type() -> None:
 def test_captions_carry_the_full_citation() -> None:
     caption = episode_captions(MACRO_EPISODES)
     (episode,) = MACRO_EPISODES
-    assert "Shaded band: documented event window" in caption
+    assert "Shaded band" in caption
+    assert "documented event window" in caption
     assert episode.title in caption
     assert "2020-01-01 to 2020-12-31" in caption
     assert episode.source_name in caption
     assert episode.source_title in caption
-    assert episode.source_url in caption
+    assert episode.source_url in caption  # travels in the markdown href
     assert f"published {episode.published.isoformat()}" in caption
     assert "drawn as observed" in caption
+
+
+def test_caption_source_is_a_clickable_named_link() -> None:
+    # second-round refinement: the source renders as [name — *title*](url),
+    # not a bare URL; the exact dates and the href are unchanged
+    (episode,) = MACRO_EPISODES
+    caption = episode_captions(MACRO_EPISODES)
+    link = f"[{episode.source_name} — *{episode.source_title}*]({episode.source_url})"
+    assert link in caption
 
 
 def test_captions_pass_the_causal_filter_by_construction() -> None:
     # the builder runs assert_no_causal_wording before returning; a
     # wording regression in the template raises here, not in production
-    for episodes in ((synthetic_episode(),), (synthetic_episode(), synthetic_episode(episode_id="two"))):
+    for episodes in (
+        (synthetic_episode(),),
+        (synthetic_episode(), synthetic_episode(episode_id="two")),
+    ):
         episode_captions(episodes)
 
 
